@@ -82,17 +82,42 @@ git -C /tmp/rigmark-quality-arkade checkout --detach e5215097ce8d9340af060412663
 docker build -t rigmark-quality-runtime:0.2 quality_suite
 ./rigmark quality list
 ./rigmark quality selftest --arkade-root /tmp/rigmark-quality-arkade
-./rigmark quality run --model MODEL_ID --task python-expiry \
-  --endpoint http://MODEL_HOST:8000/v1 --auth-file none \
-  --reasoning-effort low --output quality-results/local
-./rigmark quality report --output quality-results/local
 ```
 
-That command runs only `python-expiry` as a smoke test. Omit the `--task` flag
-to attempt all 13 tasks and write a separate receipt for each.
+`selftest` checks the reference and deliberately broken controls without
+calling a model. It can take several minutes and prints JSON diagnostics,
+not a RigMark Quality card or model receipt. Run it once after setting up the
+test image; a successful exit means the harness controls passed.
 
-`selftest` runs reference and broken controls. It should pass before you run a
-model. The runner uses OpenAI-compatible chat completions and tool calls.
+**Run the full 13-task suite** by leaving out `--task`. Each task starts in a
+fresh workspace and writes its own JSON receipt. The run prints one JSON
+status line per task; `report` turns those receipts into the shareable ASCII
+card. Keep each full run in a new output directory so old receipts do not get
+mixed into its card.
+
+```sh
+./rigmark quality run --model MODEL_ID \
+  --endpoint http://MODEL_HOST:8000/v1 --auth-file none \
+  --arkade-root /tmp/rigmark-quality-arkade \
+  --reasoning-effort low --output quality-results/full
+./rigmark quality report --output quality-results/full
+```
+
+For Qwen through a locally signed-in Toilgate account, the corresponding full
+run is:
+
+```sh
+./rigmark quality run --model Qwen3.8-27B-FP8-vllm --toilgate \
+  --arkade-root /tmp/rigmark-quality-arkade \
+  --reasoning-effort low --output quality-results/qwen-full
+./rigmark quality report --output quality-results/qwen-full
+```
+
+To try **one smoke task only**, add `--task python-expiry` to a `run` command
+and use a separate output directory. A pass on that task is not a full-suite
+result. `run` uses OpenAI-compatible chat completions and tool calls; your
+agent can launch the CLI, but the tested model works inside this typed-tool
+harness rather than the agent's own terminal session.
 
 | Provider | Connection |
 | --- | --- |
@@ -100,13 +125,14 @@ model. The runner uses OpenAI-compatible chat completions and tool calls.
 | OpenCode Zen or OpenRouter | `--endpoint URL --api-key-env MODEL_API_KEY` |
 | [Toilgate](https://toilgate.o6s.io/) | `--toilgate`, after signing in locally |
 
-For a bearer-key endpoint, pass the **name** of an environment variable,
-never the key itself:
+For an optional single-task smoke run against a bearer-key endpoint, pass the
+**name** of an environment variable, never the key itself:
 
 ```sh
 export MODEL_API_KEY='your key'
 ./rigmark quality run --model MODEL_ID --task go-worker-pool \
   --endpoint https://opencode.ai/zen/v1 --api-key-env MODEL_API_KEY \
+  --arkade-root /tmp/rigmark-quality-arkade \
   --reasoning-effort low --output quality-results/zen
 ```
 
