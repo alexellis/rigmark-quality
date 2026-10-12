@@ -11,7 +11,7 @@ jobs:
   upload:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.release.tag_name }}
       - name: Package runnable suite
@@ -23,7 +23,7 @@ jobs:
           asset="rigmark-quality-${TAG}.tar.gz"
           tar --exclude='__pycache__' --exclude='*.pyc' \
             --transform='s,^,rigmark-quality/,' -czf "$asset" \
-            rigmark quality_suite README.md PROTOCOL.md CONTRIBUTING.md \
+            rigmark quality_suite README.md AGENTS.md PROTOCOL.md CONTRIBUTING.md \
             RELEASING.md LICENSE docs examples
           sha256sum "$asset" > "${asset}.sha256"
           gh release upload "$TAG" "$asset" "${asset}.sha256" --clobber
