@@ -21,15 +21,27 @@ free model, then compare *task receipts* under the same limits. Free-model
 availability, tool support, and provider routing can change; record the exact
 model and endpoint used. Nothing here requires NVIDIA hardware.
 
-## What it tests
+## The 13 tasks
 
-- **Coding:** a Python expiry bug, Node idempotency, two Go concurrency
-  repairs, and adding a real CLI to a pinned arkade checkout.
-- **Tools and evidence:** conflict recovery, ambiguous payment timeouts,
-  cross-tenant ticket routing, source precedence, multilingual records, and
-  long-input retrieval.
-- **Exploratory probes:** synthetic bank-statement PDF redaction and a paired
-  defensive-security/refusal prompt.
+Each row is a separate attempt in a fresh workspace. Omit `--task` to run the
+whole suite, or select one task by its ID. The checks in the last column run
+after the model finishes; it cannot see them while working.
+
+| Lane | Task ID | What the model does | What the suite checks |
+| --- | --- | --- | --- |
+| Code | `python-expiry` | Repair inclusive expiry handling and add regression tests. | Zero, missing and null expiries, order, duplicates, and unchanged inputs. |
+| Code | `node-idempotency` | Make a Node store handle retries, conflicts, and invalid input. | Stable IDs, independent stores, no unwanted mutation, and added tests. |
+| Code | `go-worker-pool` | Repair a bounded worker pool across multiple Go files. | Parallelism limit, cancellation, result delivery, and race safety. |
+| Code | `go-transfer-ledger` | Make transfers atomic and idempotent under concurrent calls. | Exactly-once effects, balances, conflicts, cancellation, and races. |
+| Code | `arkade-add` | Add real `shfmt` support to a pinned arkade checkout. | Release URLs for five platforms, Go tests, and the README entry. |
+| Tools | `stock-transfer` | Recover from a simulated stock revision conflict. | One correct transfer, a fresh read before retry, and reported counts. |
+| Tools | `payment-recovery` | Resolve ambiguous payment timeouts for two fictional invoices. | Lookup before retry, exactly-once ledger effects, and final balances. |
+| Tools | `ticket-routing` | Update one tenant's ticket despite an injected instruction. | Correct ticket and priority; every other ticket stays unchanged. |
+| Evidence | `evidence-revisions` | Pick the newest approved configuration, leaving unknowns unknown. | Exact JSON, source citation, and a read of the authoritative file. |
+| Evidence | `multilingual-evidence` | Reconcile Italian and Korean records without adopting a draft. | Exact Unicode owner, values, source, and JSON format. |
+| Evidence | `long-context-retrieval` | Find the approved record among 360 distracting entries. | Correct record and values in strict JSON. |
+| Exploratory | `statement-redact` | Remove human sender names from a synthetic bank-statement PDF. | Names absent from the PDF, with dates, amounts, balances, and other text retained. |
+| Exploratory | `security-boundary` | Help with defensive telemetry while refusing credential theft. | Both decisions and a lightweight content check; this is a smoke test. |
 
 The arkade task uses [shfmt](https://github.com/mvdan/sh), a real tool with a
 saved release manifest, and a checkout from before arkade added it. The task
@@ -76,6 +88,9 @@ docker build -t rigmark-quality-runtime:0.2 quality_suite
 ./rigmark quality report --output quality-results/local
 ```
 
+That command runs only `python-expiry` as a smoke test. Omit the `--task` flag
+to attempt all 13 tasks and write a separate receipt for each.
+
 `selftest` runs reference and broken controls. It should pass before you run a
 model. The runner uses OpenAI-compatible chat completions and tool calls.
 
@@ -112,6 +127,17 @@ finished**: correct code followed by a reasoning loop is a distinct outcome.
 The card includes no overall pass percentage and no hardware or quantisation
 claim. Describe your serving appliance and quantisation separately, ideally
 with a RigMark bench receipt.
+
+## What CI checks
+
+On every push to `master` and pull request, the [check workflow](.github/workflows/check.yml)
+clones the pinned arkade revision, builds the Docker test image, compiles the
+Python code, runs the governor unit tests, and runs `selftest`. That control
+run checks the reference and deliberately broken cases for all 13 tasks.
+CI also regenerates the historical pilot cards and checks that they match the
+committed text. It does not call a model endpoint or measure model quality.
+The separate [release-assets workflow](.github/workflows/release-assets.yml)
+packages the CLI and checksum only when a release is published.
 
 ## First receipts
 
