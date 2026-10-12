@@ -5,6 +5,7 @@ import argparse
 from datetime import datetime, timezone
 import difflib
 import hashlib
+import itertools
 import json
 import os
 from pathlib import Path
@@ -184,7 +185,7 @@ print(json.dumps(judge("redacted.pdf", rows)))
 
 def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
              max_steps, seconds, reasoning_effort, thinking,
-             max_output_tokens=16000, api_key_env=None):
+             max_output_tokens=32768, api_key_env=None):
     active_suite_hash = suite_hash()
     workspace = make_workspace(task_id, root, arkade_root)
     originals = {path: (workspace / path).read_text() if (workspace / path).exists() else ''
@@ -204,14 +205,17 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
     answer = ''
     observed_models = []
     conversation_finished = False
-    for step in range(max_steps):
+    for step in itertools.count():
         remaining = seconds - (time.monotonic() - started)
         if remaining <= 0:
             failure = 'task deadline exceeded'
             break
+        if max_steps and step >= max_steps:
+            failure = 'model turn limit exceeded'
+            break
         try:
             data = completion(endpoint, model, messages, box.definitions, auth_file,
-                              max(1, min(remaining, 600)), reasoning_effort,
+                              max(1, remaining), reasoning_effort,
                               thinking, max_output_tokens, api_key_env)
             observed_models.append(data.get('model'))
             msg = data['choices'][0]['message']
@@ -255,8 +259,6 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
         except (error.URLError, TimeoutError, KeyError, IndexError, ValueError) as exc:
             failure = f'{type(exc).__name__}: {exc}'
             break
-    else:
-        failure = 'tool step budget exhausted'
     if task_id in ('python-expiry', 'node-idempotency', 'go-worker-pool',
                    'go-transfer-ledger',
                    'arkade-add', 'statement-redact'):
@@ -311,7 +313,7 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
               'interpretation': 'diagnostic_only',
               'task_status': ('exploratory' if task_id == 'statement-redact'
                               else 'experimental'),
-              'suite_version': '0.2', 'suite_sha256': active_suite_hash,
+              'suite_version': '0.3', 'suite_sha256': active_suite_hash,
               'task_sha256': task_hash,
               'request': {'temperature': 0, 'top_p': 1, 'seed': 20261011,
                           'max_tokens': max_output_tokens, 'max_steps': max_steps,
@@ -487,7 +489,7 @@ def report(output, format='ascii'):
             else:
                 row[model] = None
         rows.append(row)
-    summary = {'suite_version': '0.2', 'interpretation': 'diagnostic_only',
+    summary = {'suite_version': '0.3', 'interpretation': 'diagnostic_only',
                'models': models, 'tasks': rows}
     print(json.dumps(summary, indent=2))
 
@@ -542,8 +544,13 @@ def ascii_card(key, receipts):
     row(f"Reasoning {request_settings.get('reasoning_effort') or 'default'}"
         f"  ·  Thinking {request_settings.get('thinking', 'default')}"
         f"  ·  Output cap {request_settings.get('max_tokens', '?')}")
-    row(f"Step cap {request_settings.get('max_steps', '?')}"
-        f"  ·  Time cap {request_settings.get('task_seconds', '?')}s")
+    turn_limit = request_settings.get('max_steps', '?')
+    if receipts[0].get('suite_version') == '0.1':
+        row(f"Step cap {turn_limit}"
+            f"  ·  Time cap {request_settings.get('task_seconds', '?')}s")
+    else:
+        row(f"Turn cap {'none' if turn_limit == 0 else turn_limit}"
+            f"  ·  Time cap {request_settings.get('task_seconds', '?')}s")
     row()
     lines.append('╰' + '─' * (width - 2) + '╯')
     return '\n'.join(lines)
@@ -566,13 +573,18 @@ def main():
     parser.add_argument('--api-key-env', help='Environment variable containing a bearer key for the selected endpoint')
     parser.add_argument('--format', choices=['ascii', 'json'], default='ascii',
                         help='Report format (default: ascii)')
-    parser.add_argument('--max-steps', type=int, default=28)
-    parser.add_argument('--max-output-tokens', type=int, default=16000)
-    parser.add_argument('--seconds', type=int, default=900)
+    parser.add_argument('--max-steps', type=int, default=0,
+                        help='Optional model-turn limit; 0 means no turn limit (default)')
+    parser.add_argument('--max-output-tokens', type=int, default=32768,
+                        help='Maximum tokens in one model response (default: 32768)')
+    parser.add_argument('--seconds', type=int, default=1800,
+                        help='Wall-clock deadline per task (default: 1800)')
     parser.add_argument('--reasoning-effort', choices=['low', 'medium', 'xhigh'])
     parser.add_argument('--thinking', choices=['default', 'on', 'off'],
                         default='default')
     args = parser.parse_args()
+    if args.max_steps < 0 or args.max_output_tokens <= 0 or args.seconds <= 0:
+        parser.error('--max-steps must be non-negative; --max-output-tokens and --seconds must be positive')
     if args.command == 'list':
         for task_id, data in tasks.TASKS.items(): print(task_id, data['category'])
         return

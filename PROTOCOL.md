@@ -1,16 +1,19 @@
 # Experimental quality protocol
 
-Protocol 0.2 uses thirteen fixed tasks. It is a diagnostic suite, not a
+Protocol 0.3 uses thirteen fixed tasks. It is a diagnostic suite, not a
 quality score. A receipt is one model attempt on one task. It records the
 requested and observed model, the complete request settings, task/suite
 hashes, runtime image, elapsed time, tool calls, file diffs, independent
 checks, and the reason the governor stopped the attempt.
 
-The default limits are 16,000 output tokens per response, 28 model turns,
-and 900 seconds per task. Reasoning mode should be selected explicitly for
-matched runs. Provider-supplied usage and observed model names are recorded,
-but some providers omit them. A model mismatch or transport failure is an
-invalid comparison, not a failed coding task.
+The default limits are 32,768 output tokens per response and 1,800 seconds
+per task. Wall-clock time is the primary run limit; there is no default
+model-turn cap. An explicit `--max-steps N` can add one. Reasoning mode should
+be selected explicitly for matched runs. Provider-supplied usage and observed
+model names are recorded, but some providers omit them. A model mismatch or
+transport failure is an invalid comparison, not a failed coding task. A
+provider may reject or lower the requested response limit. Budget stops are
+recorded separately from independent task checks.
 
 The governor gives one recorded reminder after repeated unchanged reads,
 searches, or green tests. A later repeat stops as no progress. The judge runs

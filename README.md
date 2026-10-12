@@ -79,7 +79,7 @@ cd rigmark-quality
 git clone https://github.com/alexellis/arkade /tmp/rigmark-quality-arkade
 git -C /tmp/rigmark-quality-arkade checkout --detach e5215097ce8d9340af060412663f7c7130c594dd
 
-docker build -t rigmark-quality-runtime:0.2 quality_suite
+docker build -t rigmark-quality-runtime:0.3 quality_suite
 ./rigmark quality list
 ./rigmark quality selftest --arkade-root /tmp/rigmark-quality-arkade
 ```
@@ -141,8 +141,16 @@ environment variable. Select a current free model that supports tool calls.
 These fixtures are synthetic. Do not send private code in custom tasks to a
 free endpoint without checking that provider's data terms.
 The runner sends `temperature=0`, `top_p=1`, a fixed seed, and the declared
-output/step/time caps. Providers may ignore fields or route to another backend;
+output and time limits, plus a turn limit when requested. Providers may ignore
+fields or route to another backend;
 check the observed model and failure fields before comparing results.
+
+The default run is bounded by **30 minutes per task** and requests up to
+**32,768 output tokens per response**. There is no model-turn cap by default;
+the governor still stops repeated no-progress behaviour. Use `--max-steps N`
+for an explicit turn limit, or `--seconds N` and `--max-output-tokens N` to
+adjust the other limits. A provider may enforce a lower output limit. Report
+the requested limits and distinguish a budget stop from a failed task check.
 
 By default, `report` prints a compact ASCII card per model and suite hash.
 Use `--format json` for a machine-readable diagnostic matrix. Each task JSON

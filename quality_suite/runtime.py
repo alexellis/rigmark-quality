@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import uuid
 
-DEFAULT_IMAGE = 'rigmark-quality-runtime:0.2'
+DEFAULT_IMAGE = 'rigmark-quality-runtime:0.3'
 
 
 def capture(command, timeout=60):
