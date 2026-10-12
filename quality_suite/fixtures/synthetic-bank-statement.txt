@@ -1,0 +1,28 @@
+Current account statement - example only
+Fictional data. Statement period: 01/09/2026 - 30/09/2026
+
+Reference    Date        Transaction                          Amount    Balance
+
+TX-01       02/09/2026      Faster Payment from Amina El-Sayed / rent             +1,250.00   3,410.45
+
+
+TX-02       02/09/2026      Card payment to Olivia Price / books                     -25.00   3,385.45
+
+
+TX-03       03/09/2026      Transfer from Jo Park / invoice 17                      +25.00    3,410.45
+
+
+TX-04       03/09/2026      Refund from Northside Books Ltd                         +25.00    3,435.45
+
+
+TX-05       05/09/2026      Faster Payment from Leo Martin / gift                  +110.07    3,545.52
+
+
+TX-06       07/09/2026      Standing order to Jo Park / utilities                   -110.07   3,435.45
+
+
+TX-07       10/09/2026      Transfer from Amina El-Sayed / September               +310.00    3,745.45
+
+
+TX-08       11/09/2026      Interest credited                                        +0.42    3,745.87
+

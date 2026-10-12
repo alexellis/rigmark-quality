@@ -1,0 +1,63 @@
+{
+  "task": "stock-transfer",
+  "category": "tools",
+  "suite_version": "0.1",
+  "suite_sha256": "a88d665ceed48539f505e541985f352be4c45fb5592397335044ed8cdfba1e64",
+  "task_sha256": "b2580f4072c717d6fadb658dab0f5a194d93eee283830c57879ad8aef3c78f6f",
+  "request": {
+    "temperature": 0,
+    "top_p": 1,
+    "seed": 20261011,
+    "max_tokens": 8192,
+    "max_steps": 28,
+    "task_seconds": 300,
+    "reasoning_effort": "low",
+    "thinking": "off"
+  },
+  "arkade_revision": null,
+  "runtime_image_id": "sha256:2f94889f7021b82c38c685fa561c237a30d8076b7e9e207b8706d12315e2887a",
+  "requested_model": "Qwen3.8-27B-FP8-vllm",
+  "observed_models": [
+    "Qwen3.8-27B-FP8-vllm",
+    "Qwen3.8-27B-FP8-vllm",
+    "Qwen3.8-27B-FP8-vllm",
+    "Qwen3.8-27B-FP8-vllm",
+    "Qwen3.8-27B-FP8-vllm"
+  ],
+  "model_match": true,
+  "started_at": "2026-10-11T19:23:04.132826+00:00",
+  "finished_at": "2026-10-11T19:23:07.069491+00:00",
+  "elapsed_seconds": 2.9,
+  "usage": {
+    "prompt_tokens": 3293,
+    "completion_tokens": 281,
+    "reasoning_tokens": 0
+  },
+  "reasoning_diagnostics": {
+    "characters": 4,
+    "repeated_trigram_fraction": 0.0,
+    "loop_detected": false
+  },
+  "tool_diagnostics": {
+    "parsed_calls": 4,
+    "invalid_calls": 0,
+    "no_call_or_answer": false,
+    "unfinished_after_tool": false,
+    "unparsed_tool_markup": false
+  },
+  "steps": 5,
+  "checks": {
+    "state": true,
+    "one_transfer": true,
+    "read_first": true,
+    "conflict_recovery": true,
+    "reported_counts": true
+  },
+  "passed": true,
+  "failure": null,
+  "receipt_kind": "public_summary",
+  "source_note": "11 October 2026 exploratory pilot; protocol 0.1 and original fictional arkade task where applicable. Full conversation and tool trace not published.",
+  "artefact_passed": true,
+  "conversation_finished": true,
+  "comparability": "Historical protocol 0.1 pilot; thinking settings differ across models. Not comparable with current shfmt task or a model ranking."
+}

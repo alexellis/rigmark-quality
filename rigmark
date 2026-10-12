@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+"""Run the standalone RigMark quality task suite."""
+import sys
+from quality_suite.cli import main
+
+if __name__ == '__main__':
+    if len(sys.argv) < 2 or sys.argv[1] != 'quality':
+        raise SystemExit('usage: ./rigmark quality {list|selftest|run|report} [options]')
+    sys.argv.pop(1)
+    main()

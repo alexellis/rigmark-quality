@@ -1,0 +1,29 @@
+name: release assets
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Package runnable suite
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          asset="rigmark-quality-${TAG}.tar.gz"
+          tar --exclude='__pycache__' --exclude='*.pyc' \
+            --transform='s,^,rigmark-quality/,' -czf "$asset" \
+            rigmark quality_suite README.md PROTOCOL.md CONTRIBUTING.md \
+            RELEASING.md LICENSE docs examples
+          sha256sum "$asset" > "${asset}.sha256"
+          gh release upload "$TAG" "$asset" "${asset}.sha256" --clobber

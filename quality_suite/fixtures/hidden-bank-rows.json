@@ -1,0 +1,134 @@
+{
+  "hidden-1": [
+    {
+      "key": "TX-01",
+      "date": "02/09/2026",
+      "description": "Faster Payment from Nora Shah / rent",
+      "amount": "+1,250.00",
+      "balance": "3,410.45",
+      "sender": "Nora Shah"
+    },
+    {
+      "key": "TX-02",
+      "date": "02/09/2026",
+      "description": "Card payment to Dana Reed / books",
+      "amount": "-25.00",
+      "balance": "3,385.45",
+      "sender": ""
+    },
+    {
+      "key": "TX-03",
+      "date": "03/09/2026",
+      "description": "Transfer from Casey ONeil / invoice 17",
+      "amount": "+25.00",
+      "balance": "3,410.45",
+      "sender": "Casey ONeil"
+    },
+    {
+      "key": "TX-04",
+      "date": "03/09/2026",
+      "description": "Transfer from Cedar Support CIC / grant",
+      "amount": "+25.00",
+      "balance": "3,435.45",
+      "sender": ""
+    },
+    {
+      "key": "TX-05",
+      "date": "05/09/2026",
+      "description": "Faster Payment from Mira Patel / gift",
+      "amount": "+110.07",
+      "balance": "3,545.52",
+      "sender": "Mira Patel"
+    },
+    {
+      "key": "TX-06",
+      "date": "07/09/2026",
+      "description": "Standing order to Casey ONeil / utilities",
+      "amount": "-110.07",
+      "balance": "3,435.45",
+      "sender": ""
+    },
+    {
+      "key": "TX-07",
+      "date": "10/09/2026",
+      "description": "Transfer from Nora Shah / September",
+      "amount": "+310.00",
+      "balance": "3,745.45",
+      "sender": "Nora Shah"
+    },
+    {
+      "key": "TX-08",
+      "date": "11/09/2026",
+      "description": "Interest credited",
+      "amount": "+0.42",
+      "balance": "3,745.87",
+      "sender": ""
+    }
+  ],
+  "hidden-2": [
+    {
+      "key": "TX-01",
+      "date": "02/09/2026",
+      "description": "Faster Payment from Arjun Singh / rent",
+      "amount": "+1,250.00",
+      "balance": "3,410.45",
+      "sender": "Arjun Singh"
+    },
+    {
+      "key": "TX-02",
+      "date": "02/09/2026",
+      "description": "Card payment to Eva Cole / books",
+      "amount": "-25.00",
+      "balance": "3,385.45",
+      "sender": ""
+    },
+    {
+      "key": "TX-03",
+      "date": "03/09/2026",
+      "description": "Transfer from Ellen Moore / invoice 17",
+      "amount": "+25.00",
+      "balance": "3,410.45",
+      "sender": "Ellen Moore"
+    },
+    {
+      "key": "TX-04",
+      "date": "03/09/2026",
+      "description": "Transfer from Cedar Support CIC / grant",
+      "amount": "+25.00",
+      "balance": "3,435.45",
+      "sender": ""
+    },
+    {
+      "key": "TX-05",
+      "date": "05/09/2026",
+      "description": "Faster Payment from Samira Khan / gift",
+      "amount": "+110.07",
+      "balance": "3,545.52",
+      "sender": "Samira Khan"
+    },
+    {
+      "key": "TX-06",
+      "date": "07/09/2026",
+      "description": "Standing order to Ellen Moore / utilities",
+      "amount": "-110.07",
+      "balance": "3,435.45",
+      "sender": ""
+    },
+    {
+      "key": "TX-07",
+      "date": "10/09/2026",
+      "description": "Transfer from Arjun Singh / October",
+      "amount": "+310.00",
+      "balance": "3,745.45",
+      "sender": "Arjun Singh"
+    },
+    {
+      "key": "TX-08",
+      "date": "11/09/2026",
+      "description": "Interest credited",
+      "amount": "+0.42",
+      "balance": "3,745.87",
+      "sender": ""
+    }
+  ]
+}

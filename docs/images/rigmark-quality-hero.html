@@ -1,0 +1,38 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+@font-face{font-family:JBM;src:local("JetBrainsMono Nerd Font");}
+html,body{margin:0;width:1600px;height:800px;background:#0a0e13;overflow:hidden}
+body{display:flex;align-items:center;gap:64px;padding:0 88px;box-sizing:border-box;
+ background:radial-gradient(1200px 600px at 78% 40%,#0f1f24 0%,#0a0e13 60%);font-family:"Noto Sans",sans-serif;color:#e6edf3}
+.left{flex:1.15}
+.eyebrow{font-family:JBM,monospace;letter-spacing:.32em;color:#5eead4;font-size:26px;font-weight:700}
+h1{font-size:92px;line-height:1.02;margin:18px 0 22px;font-weight:800;letter-spacing:-.01em}
+h1 span{color:#f5a524}
+p{font-size:30px;line-height:1.38;color:#aab6c2;margin:0 0 26px;max-width:760px}
+.tag{display:inline-block;font-family:JBM,monospace;font-size:22px;color:#f5a524;border:2px solid #f5a52466;border-radius:8px;padding:8px 14px}
+.card{flex:.95;background:#0d141b;border:2px solid #22303c;border-radius:16px;box-shadow:0 30px 80px #0008;font-family:JBM,monospace;overflow:hidden}
+.bar{display:flex;gap:9px;align-items:center;padding:16px 20px;border-bottom:2px solid #1b2731;color:#6b7c8c;font-size:20px}
+.dot{width:13px;height:13px;border-radius:50%;background:#2b3a46}
+.body{padding:26px 30px 30px;font-size:27px;line-height:1.7}
+.t{color:#5eead4;font-weight:700}
+.row{display:flex;justify-content:space-between}
+.ok{color:#4ade80}.no{color:#f5a524}
+.muted{color:#6b7c8c;font-size:21px;margin-top:10px;line-height:1.45}
+</style></head><body>
+<div class="left">
+ <div class="eyebrow">RIGMARK · QUALITY</div>
+ <h1>Does it <span>finish</span><br>the job?</h1>
+ <p>Small, realistic coding and tool tasks for local and hosted models, with a receipt for every step.</p>
+ <div class="tag">EXPERIMENTAL · NOT A MODEL OR QUANT SCORE</div>
+</div>
+<div class="card">
+ <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>&nbsp;rigmark quality · EXAMPLE RECEIPT</div>
+ <div class="body">
+  <div class="t">TASK&nbsp; add shfmt to arkade</div>
+  <div class="row"><span>edits the right files</span><span class="ok">✓</span></div>
+  <div class="row"><span>go test passes</span><span class="ok">✓</span></div>
+  <div class="row"><span>follows repo conventions</span><span class="ok">✓</span></div>
+  <div class="row"><span>stops when done</span><span class="no">✗ 50/50 steps</span></div>
+  <div class="muted">Correct code is not the whole job:<br>the agent also has to know it's finished.</div>
+ </div>
+</div>
+</body></html>

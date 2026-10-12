@@ -1,0 +1,30 @@
+name: check
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare arkade fixture
+        run: |
+          git clone https://github.com/alexellis/arkade /tmp/arkade-source
+          git -C /tmp/arkade-source checkout --detach e5215097ce8d9340af060412663f7c7130c594dd
+      - name: Build offline runtime
+        run: docker build -t rigmark-quality-runtime:0.2 quality_suite
+      - name: Verify controls and Python
+        run: |
+          python3 -m compileall -q quality_suite rigmark
+          python3 -m unittest quality_suite.test_governor -v
+          ./rigmark quality selftest --arkade-root /tmp/arkade-source
+      - name: Render public pilot cards
+        run: |
+          ./rigmark quality report --output examples/receipts/2026-10-11-pilot > /tmp/cards.txt
+          diff -u examples/receipts/2026-10-11-pilot/cards.txt /tmp/cards.txt

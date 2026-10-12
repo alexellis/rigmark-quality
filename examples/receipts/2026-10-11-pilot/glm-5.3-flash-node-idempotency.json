@@ -1,0 +1,61 @@
+{
+  "task": "node-idempotency",
+  "category": "coding",
+  "suite_version": "0.1",
+  "suite_sha256": "a88d665ceed48539f505e541985f352be4c45fb5592397335044ed8cdfba1e64",
+  "task_sha256": "16f2443ecdfee849916995d80974213a70e3732c01f9ea980cefce86b262ce16",
+  "request": {
+    "temperature": 0,
+    "top_p": 1,
+    "seed": 20261011,
+    "max_tokens": 8192,
+    "max_steps": 28,
+    "task_seconds": 300,
+    "reasoning_effort": null,
+    "thinking": "default"
+  },
+  "arkade_revision": null,
+  "runtime_image_id": "sha256:2f94889f7021b82c38c685fa561c237a30d8076b7e9e207b8706d12315e2887a",
+  "requested_model": "glm-5.3-flash",
+  "observed_models": [
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4"
+  ],
+  "model_match": true,
+  "started_at": "2026-10-11T19:18:52.429848+00:00",
+  "finished_at": "2026-10-11T19:19:13.108228+00:00",
+  "elapsed_seconds": 20.7,
+  "usage": {
+    "prompt_tokens": 8369,
+    "completion_tokens": 1749,
+    "reasoning_tokens": 253
+  },
+  "reasoning_diagnostics": {
+    "characters": 5,
+    "repeated_trigram_fraction": 0.0,
+    "loop_detected": false
+  },
+  "tool_diagnostics": {
+    "parsed_calls": 6,
+    "invalid_calls": 0,
+    "no_call_or_answer": false,
+    "unfinished_after_tool": false,
+    "unparsed_tool_markup": false
+  },
+  "steps": 6,
+  "checks": {
+    "acceptance": true,
+    "regression_test_added": true
+  },
+  "passed": true,
+  "failure": null,
+  "receipt_kind": "public_summary",
+  "source_note": "11 October 2026 exploratory pilot; protocol 0.1 and original fictional arkade task where applicable. Full conversation and tool trace not published.",
+  "artefact_passed": true,
+  "conversation_finished": true,
+  "comparability": "Historical protocol 0.1 pilot; thinking settings differ across models. Not comparable with current shfmt task or a model ranking."
+}

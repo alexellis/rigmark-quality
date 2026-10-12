@@ -1,0 +1,174 @@
+╭────────────────────────────────────────────────────────────────────────────╮
+│                                                                            │
+│  R I G M A R K   //   QUALITY TASK RECEIPT                                 │
+│  EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE               │
+│  HISTORICAL PILOT · SETTINGS NOT MATCHED · DO NOT COMPARE MODELS           │
+│                                                                            │
+├─ MODEL ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  Qwen3.8-27B-FP8-vllm                                                      │
+│                                                                            │
+├─ TASKS ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  TASK                        ARTEFACT  FINISHED  TIME     STOP             │
+│  python-expiry               yes       yes          8.2s normal            │
+│  node-idempotency            no        yes         17.0s normal            │
+│  go-worker-pool              yes       no         246.9s tool step budget… │
+│  stock-transfer              yes       yes          2.9s normal            │
+│  ticket-routing              yes       yes          1.5s normal            │
+│  evidence-revisions          yes       yes          2.1s normal            │
+│  multilingual-evidence       no        no          19.5s tool step budget… │
+│  long-context-retrieval      no        no          22.8s tool step budget… │
+│  security-boundary           yes       yes          2.4s normal            │
+│                                                                            │
+│  Artefact and conversation completion are separate outcomes.               │
+│  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│                                                                            │
+├─ RUN ──────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  Tasks 9  ·  Suite 0.1  ·  SHA256 a88d665ceed48539…                        │
+│  Reasoning low  ·  Thinking off  ·  Output cap 8192                        │
+│  Step cap 28  ·  Time cap 300s                                             │
+│                                                                            │
+╰────────────────────────────────────────────────────────────────────────────╯
+╭────────────────────────────────────────────────────────────────────────────╮
+│                                                                            │
+│  R I G M A R K   //   QUALITY TASK RECEIPT                                 │
+│  EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE               │
+│  HISTORICAL PILOT · SETTINGS NOT MATCHED · DO NOT COMPARE MODELS           │
+│                                                                            │
+├─ MODEL ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  Qwen3.8-27B-FP8-vllm                                                      │
+│                                                                            │
+├─ TASKS ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  TASK                        ARTEFACT  FINISHED  TIME     STOP             │
+│  arkade-add                  no        no          71.4s tool step budget… │
+│                                                                            │
+│  Artefact and conversation completion are separate outcomes.               │
+│  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│                                                                            │
+├─ RUN ──────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  Tasks 1  ·  Suite 0.1  ·  SHA256 a88d665ceed48539…                        │
+│  Reasoning low  ·  Thinking off  ·  Output cap 8192                        │
+│  Step cap 50  ·  Time cap 900s                                             │
+│                                                                            │
+╰────────────────────────────────────────────────────────────────────────────╯
+╭────────────────────────────────────────────────────────────────────────────╮
+│                                                                            │
+│  R I G M A R K   //   QUALITY TASK RECEIPT                                 │
+│  EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE               │
+│  HISTORICAL PILOT · SETTINGS NOT MATCHED · DO NOT COMPARE MODELS           │
+│                                                                            │
+├─ MODEL ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  deepseek-v4-flash-0731                                                    │
+│                                                                            │
+├─ TASKS ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  TASK                        ARTEFACT  FINISHED  TIME     STOP             │
+│  python-expiry               yes       yes         16.6s normal            │
+│  node-idempotency            yes       yes         25.7s normal            │
+│  go-worker-pool              yes       yes        254.5s normal            │
+│  stock-transfer              yes       yes          6.7s normal            │
+│  ticket-routing              yes       yes          4.3s normal            │
+│  evidence-revisions          yes       yes          6.2s normal            │
+│  multilingual-evidence       no        yes          8.3s normal            │
+│  long-context-retrieval      yes       yes         13.5s normal            │
+│  security-boundary           yes       yes         11.7s normal            │
+│                                                                            │
+│  Artefact and conversation completion are separate outcomes.               │
+│  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│                                                                            │
+├─ RUN ──────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  Tasks 9  ·  Suite 0.1  ·  SHA256 a88d665ceed48539…                        │
+│  Reasoning default  ·  Thinking default  ·  Output cap 8192                │
+│  Step cap 28  ·  Time cap 300s                                             │
+│                                                                            │
+╰────────────────────────────────────────────────────────────────────────────╯
+╭────────────────────────────────────────────────────────────────────────────╮
+│                                                                            │
+│  R I G M A R K   //   QUALITY TASK RECEIPT                                 │
+│  EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE               │
+│  HISTORICAL PILOT · SETTINGS NOT MATCHED · DO NOT COMPARE MODELS           │
+│                                                                            │
+├─ MODEL ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  deepseek-v4-flash-0731                                                    │
+│                                                                            │
+├─ TASKS ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  TASK                        ARTEFACT  FINISHED  TIME     STOP             │
+│  arkade-add                  yes       no         602.8s tool step budget… │
+│                                                                            │
+│  Artefact and conversation completion are separate outcomes.               │
+│  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│                                                                            │
+├─ RUN ──────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  Tasks 1  ·  Suite 0.1  ·  SHA256 a88d665ceed48539…                        │
+│  Reasoning default  ·  Thinking default  ·  Output cap 8192                │
+│  Step cap 50  ·  Time cap 900s                                             │
+│                                                                            │
+╰────────────────────────────────────────────────────────────────────────────╯
+╭────────────────────────────────────────────────────────────────────────────╮
+│                                                                            │
+│  R I G M A R K   //   QUALITY TASK RECEIPT                                 │
+│  EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE               │
+│  HISTORICAL PILOT · SETTINGS NOT MATCHED · DO NOT COMPARE MODELS           │
+│                                                                            │
+├─ MODEL ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  glm-5.3-flash                                                             │
+│                                                                            │
+├─ TASKS ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  TASK                        ARTEFACT  FINISHED  TIME     STOP             │
+│  python-expiry               yes       yes         20.5s normal            │
+│  node-idempotency            yes       yes         20.7s normal            │
+│  go-worker-pool              no        no         115.2s model exhausted…  │
+│  stock-transfer              yes       yes          5.5s normal            │
+│  ticket-routing              yes       yes          5.0s normal            │
+│  evidence-revisions          yes       yes          3.0s normal            │
+│  multilingual-evidence       no        yes          3.5s normal            │
+│  long-context-retrieval      yes       yes          4.9s normal            │
+│  security-boundary           no        no          55.0s model exhausted…  │
+│                                                                            │
+│  Artefact and conversation completion are separate outcomes.               │
+│  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│                                                                            │
+├─ RUN ──────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  Tasks 9  ·  Suite 0.1  ·  SHA256 a88d665ceed48539…                        │
+│  Reasoning default  ·  Thinking default  ·  Output cap 8192                │
+│  Step cap 28  ·  Time cap 300s                                             │
+│                                                                            │
+╰────────────────────────────────────────────────────────────────────────────╯
+╭────────────────────────────────────────────────────────────────────────────╮
+│                                                                            │
+│  R I G M A R K   //   QUALITY TASK RECEIPT                                 │
+│  EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE               │
+│  HISTORICAL PILOT · SETTINGS NOT MATCHED · DO NOT COMPARE MODELS           │
+│                                                                            │
+├─ MODEL ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  glm-5.3-flash                                                             │
+│                                                                            │
+├─ TASKS ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  TASK                        ARTEFACT  FINISHED  TIME     STOP             │
+│  arkade-add                  no        no         151.0s tool step budget… │
+│                                                                            │
+│  Artefact and conversation completion are separate outcomes.               │
+│  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│                                                                            │
+├─ RUN ──────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  Tasks 1  ·  Suite 0.1  ·  SHA256 a88d665ceed48539…                        │
+│  Reasoning default  ·  Thinking default  ·  Output cap 8192                │
+│  Step cap 50  ·  Time cap 900s                                             │
+│                                                                            │
+╰────────────────────────────────────────────────────────────────────────────╯
