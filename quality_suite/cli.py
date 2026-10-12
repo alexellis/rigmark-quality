@@ -96,6 +96,12 @@ def make_workspace(task_id, root, arkade_root):
 def grade_coding(task_id, workspace, image, arkade_root):
     if task_id == 'statement-redact':
         return grade_statement(workspace, image)
+    with tempfile.TemporaryDirectory(prefix='rigmark-public-') as directory:
+        public_candidate = Path(directory) / 'candidate'
+        shutil.copytree(workspace, public_candidate,
+                        ignore=shutil.ignore_patterns('.git'))
+        public = runtime.run(public_candidate, image,
+                             runtime.public_command(task_id), 120)
     with tempfile.TemporaryDirectory(prefix='rigmark-accept-') as directory:
         candidate = Path(directory) / 'candidate'
         shutil.copytree(workspace, candidate, ignore=shutil.ignore_patterns('.git'))
@@ -105,7 +111,9 @@ def grade_coding(task_id, workspace, image, arkade_root):
             target.write_text(content)
         result = runtime.run(candidate, image, runtime.acceptance_command(task_id),
                              180 if task_id == 'arkade-add' else 90 if task_id == 'go-worker-pool' else 45)
-    checks = {'acceptance': result['exit_code'] == 0 and not result['timeout']}
+    checks = {'acceptance': result['exit_code'] == 0 and not result['timeout'],
+              'public_tests': public['exit_code'] == 0 and not public['timeout']}
+    result['public_tests'] = public
     if task_id == 'arkade-add':
         readme = (workspace / 'README.md').read_text()
         checks['readme'] = ('| [shfmt](https://github.com/mvdan/sh)' in readme
@@ -313,7 +321,7 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
               'interpretation': 'diagnostic_only',
               'task_status': ('exploratory' if task_id == 'statement-redact'
                               else 'experimental'),
-              'suite_version': '0.3', 'suite_sha256': active_suite_hash,
+              'suite_version': '0.4', 'suite_sha256': active_suite_hash,
               'task_sha256': task_hash,
               'request': {'temperature': 0, 'top_p': 1, 'seed': 20261011,
                           'max_tokens': max_output_tokens, 'max_steps': max_steps,
@@ -363,6 +371,20 @@ def selftest(root, arkade_root, image):
             outcomes[task_id] = {'broken': broken_checks, 'broken_exit': broken_result['exit_code'],
                                  'reference': good_checks, 'reference_exit': good_result['exit_code'],
                                  'reference_output': good_result['output'][-2000:] if not all(good_checks.values()) else ''}
+    with tempfile.TemporaryDirectory(prefix='rigmark-public-test-control-') as directory:
+        parent = Path(directory)
+        good = make_workspace('python-expiry', parent, arkade_root)
+        tasks.reference('python-expiry', good)
+        reference_checks, _ = grade_coding('python-expiry', good, image, arkade_root)
+        with (good / 'test_expiry.py').open('a') as tests:
+            tests.write('\nclass RigmarkBrokenTest(unittest.TestCase):\n'
+                        '    def test_deliberate_failure(self):\n'
+                        '        self.fail("candidate test failure")\n')
+        broken_checks, _ = grade_coding('python-expiry', good, image, arkade_root)
+        outcomes['public-test-control'] = {
+            'reference': {'public_tests': reference_checks['public_tests']},
+            'broken': {'public_tests': broken_checks['public_tests'],
+                       'acceptance': broken_checks['acceptance']}}
     with tempfile.TemporaryDirectory(prefix='rigmark-bank-controls-') as directory:
         workspace = Path(directory)
         shutil.copyfile(Path(__file__).parent / 'bank_statement.py',
@@ -489,7 +511,7 @@ def report(output, format='ascii'):
             else:
                 row[model] = None
         rows.append(row)
-    summary = {'suite_version': '0.3', 'interpretation': 'diagnostic_only',
+    summary = {'suite_version': '0.4', 'interpretation': 'diagnostic_only',
                'models': models, 'tasks': rows}
     print(json.dumps(summary, indent=2))
 

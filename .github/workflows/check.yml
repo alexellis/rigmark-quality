@@ -18,7 +18,7 @@ jobs:
           git clone https://github.com/alexellis/arkade /tmp/arkade-source
           git -C /tmp/arkade-source checkout --detach e5215097ce8d9340af060412663f7c7130c594dd
       - name: Build offline runtime
-        run: docker build -t rigmark-quality-runtime:0.3 quality_suite
+        run: docker build -t rigmark-quality-runtime:0.4 quality_suite
       - name: Verify controls and Python
         run: |
           python3 -m compileall -q quality_suite rigmark

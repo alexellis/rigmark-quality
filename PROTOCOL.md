@@ -1,6 +1,6 @@
 # Experimental quality protocol
 
-Protocol 0.3 uses thirteen fixed tasks. It is a diagnostic suite, not a
+Protocol 0.4 uses thirteen fixed tasks. It is a diagnostic suite, not a
 quality score. A receipt is one model attempt on one task. It records the
 requested and observed model, the complete request settings, task/suite
 hashes, runtime image, elapsed time, tool calls, file diffs, independent
@@ -16,10 +16,11 @@ provider may reject or lower the requested response limit. Budget stops are
 recorded separately from independent task checks.
 
 The governor gives one recorded reminder after repeated unchanged reads,
-searches, or green tests. A later repeat stops as no progress. The judge runs
-checks withheld from the agent only after the attempt stops. These checks are
-public and may enter training data. It reports file artefact
-correctness separately from whether the conversation reached a final answer.
+searches, or green tests. A later repeat stops as no progress. After the
+attempt stops, the judge reruns the public tests against the final files and
+runs checks withheld from the agent. These checks are public and may enter
+training data. It reports file artefact correctness separately from whether
+the conversation reached a final answer.
 A task can have correct code and an unfinished conversation.
 
 Coding tasks run in an offline Docker container with a read-only root,

@@ -79,7 +79,7 @@ cd rigmark-quality
 git clone https://github.com/alexellis/arkade /tmp/rigmark-quality-arkade
 git -C /tmp/rigmark-quality-arkade checkout --detach e5215097ce8d9340af060412663f7c7130c594dd
 
-docker build -t rigmark-quality-runtime:0.3 quality_suite
+docker build -t rigmark-quality-runtime:0.4 quality_suite
 ./rigmark quality list
 ./rigmark quality selftest --arkade-root /tmp/rigmark-quality-arkade
 ```
@@ -158,6 +158,8 @@ receipt records the requested and observed model, request limits, suite and
 task hashes, runtime image, checks, elapsed time, tool trace, and stop reason.
 The card deliberately separates **artefact passed** from **conversation
 finished**: correct code followed by a reasoning loop is a distinct outcome.
+Coding artefacts must pass both the final public tests and withheld checks;
+an agent's own failing regression test cannot count as a passing artefact.
 The card includes no overall pass percentage and no hardware or quantisation
 claim. Describe your serving appliance and quantisation separately, ideally
 with a RigMark bench receipt.
