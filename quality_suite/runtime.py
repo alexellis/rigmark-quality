@@ -34,7 +34,7 @@ def run(workspace, image, command, timeout=120):
     name = 'rigmark-quality-' + uuid.uuid4().hex[:12]
     args = ['docker', 'run', '--name', name, '--network=none', '--read-only',
             '--cap-drop=ALL', '--security-opt=no-new-privileges', '--pids-limit=128',
-            '--memory=2g', '--cpus=2', '--user=1000:1000',
+            '--memory=2g', '--cpus=2', f'--user={os.getuid()}:{os.getgid()}',
             '--tmpfs=/tmp:rw,exec,nosuid,nodev,size=768m,mode=1777',
             '-e', 'HOME=/tmp', '-e', 'GOCACHE=/tmp/go-cache', '-e', 'GOPROXY=off',
             '-e', 'GOTOOLCHAIN=local', '-e', 'GOSUMDB=off',
