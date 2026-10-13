@@ -10,11 +10,14 @@
   ones as though the harness were identical. Preserve failures and timeouts.
 - Keep artefact correctness separate from conversation completion. Do not turn
   a correct file followed by a reasoning loop into an unqualified pass.
-- `selftest` checks the harness without calling a model. `run` calls a model;
-  omit `--task` for all 13 tasks. `report` renders receipts as ASCII or JSON.
+- `selftest` checks both graders without calling a model. `run` calls a model;
+  omit `--task` for all 13 tasks. `arkade-add` provisions a fresh Slicer
+  OpenCode VM; the other tasks use typed tools. `report` renders receipts.
 - Build the offline image and run the reference/broken controls for changes to
   tasks, tools, or judges. Use the pinned arkade revision in `README.md` for
-  `arkade-add`. Run Python compilation and governor unit tests as CI does.
+  `arkade-add`. Keep its agent prompt short, allow normal repository access,
+  and inject independent checks only after it stops. Run Python compilation
+  and governor unit tests as CI does.
 - Run `actionlint` after workflow edits. Format only files you change, and use
   British English.
 - Do not commit, push, or release unless explicitly asked. Sign off any

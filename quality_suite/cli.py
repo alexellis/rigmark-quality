@@ -17,9 +17,10 @@ from collections import Counter
 import tempfile
 import time
 import textwrap
+import uuid
 from urllib import error, parse, request
 
-from . import evaluators, governor, runtime, tasks, tools
+from . import evaluators, governor, native_arkade, runtime, tasks, tools
 
 
 def utc_now():
@@ -110,39 +111,23 @@ def grade_coding(task_id, workspace, image, arkade_root):
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content)
         result = runtime.run(candidate, image, runtime.acceptance_command(task_id),
-                             180 if task_id == 'arkade-add' else 90 if task_id == 'go-worker-pool' else 45)
+                             90 if task_id == 'go-worker-pool' else 45)
     checks = {'acceptance': result['exit_code'] == 0 and not result['timeout'],
               'public_tests': public['exit_code'] == 0 and not public['timeout']}
     result['public_tests'] = public
-    if task_id == 'arkade-add':
-        readme = (workspace / 'README.md').read_text()
-        checks['readme'] = ('| [shfmt](https://github.com/mvdan/sh)' in readme
-                            and 'There are 221 tools' in readme)
-        # The model is explicitly asked to add public coverage and follow gofmt.
-        checks['public_test'] = (workspace / 'pkg/get/rigmark_test.go').exists()
-        if checks['public_test']:
-            output = subprocess.run(['docker', 'run', '--rm', '--network=none',
-                '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges',
-                '--user=1000:1000', '-v', f'{workspace.resolve()}:/workspace:ro',
-                '-w', '/workspace', image, 'gofmt', '-l', 'pkg/get/tools.go',
-                'pkg/get/rigmark_test.go'], text=True, capture_output=True, timeout=30)
-            checks['gofmt'] = output.returncode == 0 and not output.stdout.strip()
-        else:
-            checks['gofmt'] = False
-    else:
-        test_name = {'python-expiry': 'test_expiry.py',
-                     'node-idempotency': 'store.test.js',
-                     'go-worker-pool': 'pool_test.go',
-                     'go-transfer-ledger': 'transfer_test.go'}[task_id]
-        checks['regression_test_added'] = len((workspace / test_name).read_text()) > len(tasks.TASKS[task_id]['files'][test_name]) + 20
-        if task_id in ('go-worker-pool', 'go-transfer-ledger'):
-            source_name = 'pool.go' if task_id == 'go-worker-pool' else 'transfer.go'
-            formatted = subprocess.run(['docker', 'run', '--rm', '--network=none',
-                '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges',
-                '--user=1000:1000', '-v', f'{workspace.resolve()}:/workspace:ro',
-                '-w', '/workspace', image, 'gofmt', '-l', source_name, test_name],
-                text=True, capture_output=True, timeout=30)
-            checks['gofmt'] = formatted.returncode == 0 and not formatted.stdout.strip()
+    test_name = {'python-expiry': 'test_expiry.py',
+                 'node-idempotency': 'store.test.js',
+                 'go-worker-pool': 'pool_test.go',
+                 'go-transfer-ledger': 'transfer_test.go'}[task_id]
+    checks['regression_test_added'] = len((workspace / test_name).read_text()) > len(tasks.TASKS[task_id]['files'][test_name]) + 20
+    if task_id in ('go-worker-pool', 'go-transfer-ledger'):
+        source_name = 'pool.go' if task_id == 'go-worker-pool' else 'transfer.go'
+        formatted = subprocess.run(['docker', 'run', '--rm', '--network=none',
+            '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges',
+            '--user=1000:1000', '-v', f'{workspace.resolve()}:/workspace:ro',
+            '-w', '/workspace', image, 'gofmt', '-l', source_name, test_name],
+            text=True, capture_output=True, timeout=30)
+        checks['gofmt'] = formatted.returncode == 0 and not formatted.stdout.strip()
     return checks, result
 
 
@@ -194,6 +179,8 @@ print(json.dumps(judge("redacted.pdf", rows)))
 def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
              max_steps, seconds, reasoning_effort, thinking,
              max_output_tokens=32768, api_key_env=None):
+    if task_id == 'arkade-add':
+        raise ValueError('arkade-add requires the native Slicer OpenCode runner')
     active_suite_hash = suite_hash()
     workspace = make_workspace(task_id, root, arkade_root)
     originals = {path: (workspace / path).read_text() if (workspace / path).exists() else ''
@@ -268,8 +255,7 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
             failure = f'{type(exc).__name__}: {exc}'
             break
     if task_id in ('python-expiry', 'node-idempotency', 'go-worker-pool',
-                   'go-transfer-ledger',
-                   'arkade-add', 'statement-redact'):
+                   'go-transfer-ledger', 'statement-redact'):
         checks, acceptance = grade_coding(task_id, workspace, image, arkade_root)
     else:
         checks = box.grade(answer)
@@ -321,7 +307,7 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
               'interpretation': 'diagnostic_only',
               'task_status': ('exploratory' if task_id == 'statement-redact'
                               else 'experimental'),
-              'suite_version': '0.6', 'suite_sha256': active_suite_hash,
+              'suite_version': '0.7', 'suite_sha256': active_suite_hash,
               'task_sha256': task_hash,
               'request': {'temperature': 0, 'top_p': 1, 'seed': 20261011,
                           'max_tokens': max_output_tokens, 'max_steps': max_steps,
@@ -353,8 +339,7 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
 def selftest(root, arkade_root, image):
     outcomes = {}
     for task_id in ('python-expiry', 'node-idempotency', 'go-worker-pool',
-                    'go-transfer-ledger',
-                    'arkade-add', 'statement-redact'):
+                    'go-transfer-ledger', 'statement-redact'):
         with tempfile.TemporaryDirectory(prefix='rigmark-control-') as directory:
             parent = Path(directory)
             broken = make_workspace(task_id, parent, arkade_root)
@@ -363,7 +348,7 @@ def selftest(root, arkade_root, image):
             good = make_workspace(task_id, parent / 'good', arkade_root)
             tasks.reference(task_id, good)
             format_result = None
-            if task_id in ('arkade-add', 'go-worker-pool', 'go-transfer-ledger'):
+            if task_id in ('go-worker-pool', 'go-transfer-ledger'):
                 format_result = tools.ToolBox(task_id, good, image).call('format_go', '{}')
             good_checks, good_result = grade_coding(task_id, good, image, arkade_root)
             if format_result is not None:
@@ -371,6 +356,21 @@ def selftest(root, arkade_root, image):
             outcomes[task_id] = {'broken': broken_checks, 'broken_exit': broken_result['exit_code'],
                                  'reference': good_checks, 'reference_exit': good_result['exit_code'],
                                  'reference_output': good_result['output'][-2000:] if not all(good_checks.values()) else ''}
+    with tempfile.TemporaryDirectory(prefix='rigmark-native-arkade-control-') as directory:
+        parent = Path(directory)
+        broken = make_workspace('arkade-add', parent, arkade_root)
+        broken_checks, _ = native_arkade.grade(broken, arkade_root, image)
+        (parent / 'good').mkdir()
+        good = make_workspace('arkade-add', parent / 'good', arkade_root)
+        tasks.reference('arkade-add', good)
+        format_result = runtime.run(good, image,
+                                    'gofmt -s -w pkg/get/tools.go pkg/get/rigmark_test.go', 30)
+        native_checks, native_details = native_arkade.grade(good, arkade_root, image)
+        outcomes['native-arkade-add'] = {
+            'broken': broken_checks, 'reference': native_checks,
+            'format_tool': format_result.get('exit_code') == 0,
+            'reference_output': native_details['acceptance']['output'][-2000:]
+                                if not all(native_checks.values()) else ''}
     with tempfile.TemporaryDirectory(prefix='rigmark-public-test-control-') as directory:
         parent = Path(directory)
         good = make_workspace('python-expiry', parent, arkade_root)
@@ -389,15 +389,20 @@ def selftest(root, arkade_root, image):
         parent = Path(directory)
         workspace = make_workspace('arkade-add', parent, arkade_root)
         tasks.reference('arkade-add', workspace)
-        tools.ToolBox('arkade-add', workspace, image).call('format_go', '{}')
-        (workspace / 'pkg/get/rigmark_test.go').write_text(
-            'package get\n\nimport "testing"\n\n'
-            'func Test_DownloadShfmt(t *testing.T) {\n\tt.Fatal("must run")\n}\n')
-        result = runtime.run(workspace, image, runtime.public_command('arkade-add'), 180)
-        ran_test = result['exit_code'] != 0 and 'must run' in result['output']
+        (workspace / 'pkg/get/rigmark_test.go').unlink()
+        with (workspace / 'pkg/get/get_test.go').open('a') as tests:
+            tests.write('\nfunc Test_DownloadShfmt(t *testing.T) {\n'
+                        '\tfor _, tool := range MakeTools() {\n'
+                        '\t\tif tool.Name == "shfmt" { return }\n'
+                        '\t}\n\tt.Fatal("missing shfmt")\n}\n')
+        runtime.run(workspace, image, 'gofmt -s -w pkg/get/tools.go pkg/get/get_test.go', 30)
+        good_checks, _ = native_arkade.grade(workspace, arkade_root, image)
+        with (workspace / 'pkg/get/get_test.go').open('a') as tests:
+            tests.write('\nfunc TestRigmarkBroken(t *testing.T) { t.Fatal("must run") }\n')
+        broken_checks, _ = native_arkade.grade(workspace, arkade_root, image)
         outcomes['arkade-public-test-control'] = {
-            'reference': {'alternate_test_name_runs': ran_test},
-            'broken': {'false_green': not ran_test}}
+            'reference': good_checks,
+            'broken': broken_checks}
     with tempfile.TemporaryDirectory(prefix='rigmark-bank-controls-') as directory:
         workspace = Path(directory)
         shutil.copyfile(Path(__file__).parent / 'bank_statement.py',
@@ -498,7 +503,8 @@ def report(output, format='ascii'):
         for receipt in receipts:
             request_signature = json.dumps(receipt.get('request', {}), sort_keys=True)
             key = (receipt.get('suite_sha256', 'unknown'),
-                   receipt['requested_model'], request_signature)
+                   receipt['requested_model'],
+                   receipt.get('run_group') or request_signature)
             groups.setdefault(key, []).append(receipt)
         for key, group in sorted(groups.items()):
             print(ascii_card(key, group))
@@ -531,8 +537,11 @@ def report(output, format='ascii'):
 
 def ascii_card(key, receipts):
     """A compact per-model receipt; no overall model-quality score."""
-    suite_hash, model, request_signature = key
-    request_settings = json.loads(request_signature)
+    suite_hash, model, _ = key
+    typed_receipt = next((r for r in receipts
+                          if r.get('harness') != 'slicer-opencode-native'), None)
+    request_settings = (typed_receipt or receipts[0]).get('request', {})
+    native = any(r.get('harness') == 'slicer-opencode-native' for r in receipts)
     width = 78
     inner = width - 4
     lines = ['╭' + '─' * (width - 2) + '╮']
@@ -576,16 +585,29 @@ def ascii_card(key, receipts):
     row()
     section('RUN')
     row(f"Tasks {len(receipts)}  ·  Suite {receipts[0].get('suite_version', '?')}  ·  SHA256 {suite_hash[:16]}…")
-    row(f"Reasoning {request_settings.get('reasoning_effort') or 'default'}"
-        f"  ·  Thinking {request_settings.get('thinking', 'default')}"
-        f"  ·  Output cap {request_settings.get('max_tokens', '?')}")
-    turn_limit = request_settings.get('max_steps', '?')
-    if receipts[0].get('suite_version') == '0.1':
-        row(f"Step cap {turn_limit}"
-            f"  ·  Time cap {request_settings.get('task_seconds', '?')}s")
-    else:
+    if typed_receipt and not native:
+        row(f"Reasoning {request_settings.get('reasoning_effort') or 'default'}"
+            f"  ·  Thinking {request_settings.get('thinking', 'default')}"
+            f"  ·  Output cap {request_settings.get('max_tokens', '?')}")
+        turn_limit = request_settings.get('max_steps', '?')
+        if receipts[0].get('suite_version') == '0.1':
+            row(f"Step cap {turn_limit}"
+                f"  ·  Time cap {request_settings.get('task_seconds', '?')}s")
+        else:
+            row(f"Turn cap {'none' if turn_limit == 0 else turn_limit}"
+                f"  ·  Time cap {request_settings.get('task_seconds', '?')}s")
+    elif typed_receipt:
+        row(f"Typed tools: reasoning {request_settings.get('reasoning_effort') or 'default'}"
+            f"  ·  thinking {request_settings.get('thinking', 'default')}"
+            f"  ·  output cap {request_settings.get('max_tokens', '?')}")
+        turn_limit = request_settings.get('max_steps', '?')
         row(f"Turn cap {'none' if turn_limit == 0 else turn_limit}"
-            f"  ·  Time cap {request_settings.get('task_seconds', '?')}s")
+            f"  ·  time cap {request_settings.get('task_seconds', '?')}s")
+    if native:
+        agent = next(r for r in receipts if r.get('harness') == 'slicer-opencode-native')
+        row(f"Arkade: OpenCode in fresh Slicer VM · {agent.get('agent_model', '?')}")
+        row(f"Agent variant {agent.get('agent_variant') or 'default'}"
+            f"  ·  time cap {agent.get('request', {}).get('task_seconds', '?')}s")
     row()
     lines.append('╰' + '─' * (width - 2) + '╯')
     return '\n'.join(lines)
@@ -605,6 +627,12 @@ def main():
                         help='Optional Toilgate OAuth file; default: no authentication')
     parser.add_argument('--toilgate', action='store_true',
                         help='Use the locally signed-in Toilgate account')
+    parser.add_argument('--agent-model',
+                        help='OpenCode provider/model for the native arkade task; with --toilgate, defaults to toilgate/MODEL_ID')
+    parser.add_argument('--agent-config-file', type=Path,
+                        help='OpenCode config copied into the fresh arkade VM')
+    parser.add_argument('--keep-agent-vm', action='store_true',
+                        help='Retain the tagged arkade VM after the run for inspection')
     parser.add_argument('--api-key-env', help='Environment variable containing a bearer key for the selected endpoint')
     parser.add_argument('--format', choices=['ascii', 'json'], default='ascii',
                         help='Report format (default: ascii)')
@@ -635,22 +663,51 @@ def main():
         return
     if not args.model:
         parser.error('run requires at least one --model')
+    selected = args.task or list(tasks.TASKS)
+    native_selected = 'arkade-add' in selected
+    if native_selected and args.max_steps:
+        parser.error('--max-steps is only available for typed-tool tasks; the native arkade task uses --seconds')
+    if native_selected and args.thinking != 'default':
+        parser.error('--thinking is only available for typed-tool tasks; configure the OpenCode provider for arkade')
+    if native_selected and not args.toilgate and not args.agent_model:
+        parser.error('arkade-add requires --agent-model PROVIDER/MODEL for OpenCode, or --toilgate')
+    if native_selected and args.agent_model and len(args.model) > 1:
+        parser.error('--agent-model can only be used with one --model')
     if args.toilgate:
         if args.endpoint or args.api_key_env:
             parser.error('--toilgate cannot be combined with --endpoint or --api-key-env')
         args.endpoint = 'https://toilgate.o6s.io/v1'
         args.auth_file = str(Path.home() / '.local/share/opencode/auth.json')
-    if not args.endpoint:
-        parser.error('run requires --endpoint or --toilgate')
+    if not args.endpoint and any(task_id != 'arkade-add' for task_id in selected):
+        parser.error('typed-tool tasks require --endpoint or --toilgate')
     args.output.mkdir(parents=True, exist_ok=True)
     for model in args.model:
-        for task_id in args.task or tasks.TASKS:
-            with tempfile.TemporaryDirectory(prefix='rigmark-quality-') as directory:
-                result = run_task(task_id, model, Path(directory), args.arkade_root,
-                                  args.image, args.endpoint, args.auth_file,
-                                  args.max_steps, args.seconds, args.reasoning_effort,
-                                  args.thinking, args.max_output_tokens,
-                                  args.api_key_env)
+        run_group = uuid.uuid4().hex
+        for task_id in selected:
+            if task_id == 'arkade-add':
+                agent_model = args.agent_model or (model if model.startswith('toilgate/')
+                                                   else 'toilgate/' + model)
+                result = native_arkade.run(
+                    model, agent_model, args.arkade_root, args.image, args.output,
+                    seconds=args.seconds, keep_vm=args.keep_agent_vm,
+                    config_file=args.agent_config_file, variant=args.reasoning_effort)
+                result['suite_sha256'] = suite_hash()
+                spec = {'task': tasks.TASKS[task_id], 'prompt': native_arkade.PROMPT}
+                result['task_sha256'] = hashlib.sha256(
+                    json.dumps(spec, sort_keys=True).encode()).hexdigest()
+                result['runtime_image_id'] = runtime.image_id(args.image)
+                result['request'] = {'agent_model': agent_model,
+                                     'agent_variant': args.reasoning_effort,
+                                     'task_seconds': args.seconds,
+                                     'harness': 'slicer-opencode-native'}
+            else:
+                with tempfile.TemporaryDirectory(prefix='rigmark-quality-') as directory:
+                    result = run_task(task_id, model, Path(directory), args.arkade_root,
+                                      args.image, args.endpoint, args.auth_file,
+                                      args.max_steps, args.seconds, args.reasoning_effort,
+                                      args.thinking, args.max_output_tokens,
+                                      args.api_key_env)
+            result['run_group'] = run_group
             filename = args.output / f'{model.replace("/", "-")}-{task_id}.json'
             filename.write_text(json.dumps(result, indent=2, ensure_ascii=False))
             print(json.dumps({'task': task_id, 'model': model,

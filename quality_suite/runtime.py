@@ -53,7 +53,6 @@ def public_command(task_id):
         'node-idempotency': 'node store.test.js',
         'go-worker-pool': 'go test -race -count=1 -timeout=60s ./...',
         'go-transfer-ledger': 'go test -race -count=1 -timeout=60s ./...',
-        'arkade-add': 'format=$(gofmt -l pkg/get/tools.go pkg/get/rigmark_test.go) || exit 1; if [ -n "$format" ]; then printf "Unformatted Go files:\n%s\n" "$format"; exit 1; fi; grep -Eq "func[[:space:]]+Test[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\\(" pkg/get/rigmark_test.go || { echo "No Go test in pkg/get/rigmark_test.go"; exit 1; }; go test -mod=vendor -count=1 -timeout=90s ./pkg/get',
         'statement-redact': 'python3 -B test_statement.py',
     }[task_id]
 

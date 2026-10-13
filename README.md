@@ -2,10 +2,10 @@
 
 ![RigMark Quality: does it finish the job?](docs/images/rigmark-quality-hero.png)
 
-**Small coding and tool tasks, run through a typed-tool harness.** RigMark
-Quality asks a model to edit code, use tools, and finish the job. It checks the
-resulting files independently and records what happened in a shareable receipt.
-This is not a full shell-enabled coding-agent session.
+**Small coding and tool tasks, independently checked.** Most tasks use a
+restricted typed-tool harness. `arkade-add` runs a real OpenCode coding agent
+inside a fresh Slicer VM with the complete repository, its `AGENTS.md`, and a
+terminal. The receipt identifies which harness ran each task.
 
 This is **experimental**. Its thirteen tasks are a diagnostic starting point,
 not a complete quality test of a model, a quantisation, or an agent product.
@@ -33,7 +33,7 @@ after the model finishes; it cannot see them while working.
 | Code | `node-idempotency` | Make a Node store handle retries, conflicts, and invalid input. | Stable IDs, independent stores, no unwanted mutation, and added tests. |
 | Code | `go-worker-pool` | Repair a bounded worker pool across multiple Go files. | Parallelism limit, cancellation, result delivery, and race safety. |
 | Code | `go-transfer-ledger` | Make transfers atomic and idempotent under concurrent calls. | Exactly-once effects, balances, conflicts, cancellation, and races. |
-| Code | `arkade-add` | Add real `shfmt` support to a pinned arkade checkout. | Release URLs for five platforms, Go tests, and the README entry. |
+| Native agent | `arkade-add` | Add real `shfmt` support to a pinned arkade checkout, following its `AGENTS.md`. | Release URLs, the agent's Go test, formatting, and the README entry. |
 | Tools | `stock-transfer` | Recover from a simulated stock revision conflict. | One correct transfer, a fresh read before retry, and reported counts. |
 | Tools | `payment-recovery` | Resolve ambiguous payment timeouts for two fictional invoices. | Lookup before retry, exactly-once ledger effects, and final balances. |
 | Tools | `ticket-routing` | Update one tenant's ticket despite an injected instruction. | Correct ticket and priority; every other ticket stays unchanged. |
@@ -43,25 +43,25 @@ after the model finishes; it cannot see them while working.
 | Exploratory | `statement-redact` | Remove human sender names from a synthetic bank-statement PDF. | Names absent from the PDF, with dates, amounts, balances, and other text retained. |
 | Exploratory | `security-boundary` | Help with defensive telemetry while refusing credential theft. | Both decisions and a lightweight content check; this is a smoke test. |
 
-The arkade task uses [shfmt](https://github.com/mvdan/sh), a real tool with a
-saved release manifest, and a checkout from before arkade added it. The task
-workspace omits `.git`, so an agent cannot inspect the later solution in its
-history. A model may have seen arkade's real shfmt change during training, so
-a pass can reflect recall rather than repository reasoning. Public tasks and
-checks can likewise enter future training data. We do not download or execute
-release binaries during the test. Its public check formats the Go files,
-requires a test in the new test file,
-and runs the full offline `pkg/get` package. The independent check verifies
-release URLs for five platforms. Search tolerates Go's aligned whitespace
-and accepts directory paths. The task has no separate repository-exploration
-turn limit.
+The arkade task uses [shfmt](https://github.com/mvdan/sh), a real tool, and a
+checkout from before arkade added it. The agent sees the entire repository and
+the short prompt: “Add shfmt from mvdan/sh to arkade get. Follow AGENTS.md.
+Work in this checkout; do not commit or open a PR.” It can inspect releases,
+run commands, and download binaries as arkade's instructions require. After
+the agent stops, the suite copies its checkout out of the VM. An offline Docker
+judge runs `pkg/get` tests and independent release-URL checks, accepts a Go
+test in any changed `*_test.go` file, and checks the README and Go formatting.
+The model never sees those independent checks during its attempt. The VM is
+deleted after the receipt is captured unless `--keep-agent-vm` is set.
+
+A model may have seen arkade's later shfmt change during training, so a pass
+can reflect recall rather than repository reasoning. Public tasks and checks
+can likewise enter future training data.
 The PDF and security cases need further validation before they can support
 stronger claims.
 
-The present coding harness exposes typed file/edit/test tools, **not a normal
-shell-enabled OpenCode session**. That constraint is visible in every receipt
-and may change how a model behaves. We plan a shell-enabled control before
-making broad coding-agent comparisons.
+The other coding tasks still expose typed file/edit/test tools. Do not treat
+their results as ordinary OpenCode or terminal-agent results.
 
 ## Try it
 
@@ -70,9 +70,9 @@ include a runnable tarball and a SHA-256 checksum. You can use those instead
 of cloning the repository; the remaining Docker and arkade setup is the same.
 See [RELEASING.md](RELEASING.md) for the release process.
 
-Use a disposable VM, for example a
-[Slicer VM](https://github.com/slicervm/agent-skills), with Docker Community
-Edition installed. Docker runs public and withheld checks
+Use a host with Slicer, OpenCode credentials, and Docker Community Edition.
+`arkade-add` creates its own disposable [Slicer VM](https://github.com/slicervm/agent-skills).
+Docker runs public and withheld checks
 with networking disabled, a read-only root, and resource limits. Start with a
 fresh VM or cold fork for each model and keep credentials out of reusable
 snapshots.
@@ -94,22 +94,23 @@ calling a model. It can take several minutes and prints JSON diagnostics,
 not a RigMark Quality card or model receipt. Run it once after setting up the
 test image; a successful exit means the harness controls passed.
 
-**Run the full 13-task suite** by leaving out `--task`. Each task starts in a
-fresh workspace and writes its own JSON receipt. The run prints one JSON
-status line per task; `report` turns those receipts into the shareable ASCII
-card. Keep each full run in a new output directory so old receipts do not get
-mixed into its card.
+**Run the full 13-task suite** by leaving out `--task`. Twelve tasks use fresh
+typed-tool workspaces; `arkade-add` launches a fresh OpenCode VM. The run
+prints one JSON status line per task; `report` combines that run's receipts
+into a shareable ASCII card. Keep each full run in a new output directory so
+old receipts do not get mixed into its card.
 
 ```sh
 ./rigmark quality run --model MODEL_ID \
   --endpoint http://MODEL_HOST:8000/v1 --auth-file none \
+  --agent-model OPENCODE_PROVIDER/MODEL_ID \
   --arkade-root /tmp/rigmark-quality-arkade \
   --reasoning-effort low --output quality-results/full
 ./rigmark quality report --output quality-results/full
 ```
 
-For Qwen through a locally signed-in Toilgate account, the corresponding full
-run is:
+For Qwen through a locally signed-in Toilgate account, OpenCode uses the same
+contender for its primary and small model. The corresponding full run is:
 
 ```sh
 ./rigmark quality run --model Qwen3.8-27B-FP8-vllm --toilgate \
@@ -120,9 +121,16 @@ run is:
 
 To try **one smoke task only**, add `--task python-expiry` to a `run` command
 and use a separate output directory. A pass on that task is not a full-suite
-result. `run` uses OpenAI-compatible chat completions and tool calls; your
-agent can launch the CLI, but the tested model works inside this typed-tool
-harness rather than the agent's own terminal session.
+result. The other twelve tasks use OpenAI-compatible chat completions and
+typed tools. `arkade-add` uses OpenCode in its normal terminal-enabled agent
+mode. When using `--endpoint` for a full run, configure that endpoint in
+OpenCode and provide `--agent-model`; the native task cannot infer OpenCode
+configuration from an endpoint URL. `--seconds` limits both harnesses.
+`--max-steps` and `--thinking` apply only to typed-tool tasks and cannot be
+set when `arkade-add` is selected. `--reasoning-effort` maps to OpenCode's
+`--variant` for the native task; verify provider support. OpenCode controls
+its own per-response token limit, which the receipt does not equate with
+the typed-tool token cap.
 
 | Provider | Connection |
 | --- | --- |
@@ -175,7 +183,8 @@ with a RigMark bench receipt.
 On every push to `master` and pull request, the [check workflow](.github/workflows/check.yml)
 clones the pinned arkade revision, builds the Docker test image, compiles the
 Python code, runs the governor unit tests, and runs `selftest`. That control
-run checks the reference and deliberately broken cases for all 13 tasks.
+run checks the reference and deliberately broken cases for all 13 tasks,
+including the native arkade artefact grader. It does not launch OpenCode.
 CI also regenerates every committed receipt card and checks that it matches
 the JSON summaries. It does not call a model endpoint or measure model quality.
 The separate [release-assets workflow](.github/workflows/release-assets.yml)

@@ -292,26 +292,9 @@ func TestTransferOne(t *testing.T) {
 '''}
     },
     "arkade-add": {
-        "category": "coding", "editable": ["pkg/get/tools.go", "pkg/get/rigmark_test.go", "README.md"],
-        "prompt": "Add the real shfmt CLI to this pinned arkade checkout, from before shfmt was in the catalogue. Read AGENTS.md and RELEASE.md first. RELEASE.md is a saved release manifest for this offline task; do not download or execute release binaries, create a PR, or commit. The registry is MakeTools in pkg/get/tools.go; follow a nearby Tool/BinaryTemplate pattern and use the release asset names in RELEASE.md. Cover Linux amd64/arm64, macOS amd64/arm64, and Windows amd64 without pinning the tool version. Create pkg/get/rigmark_test.go with URL tests for those five platforms. Add shfmt to the README tool table and update its count. The README table's wide padding is cosmetic; a valid Markdown row need not match its column widths. Only edit pkg/get/tools.go, pkg/get/rigmark_test.go, README.md. Run the public tests before finishing. The workspace has no .git directory. Files can be large: read_file supports offset/limit; search_files accepts a file or directory and tolerates aligned whitespace; apply_patch replaces a unique exact substring.",
-        "files": {"RELEASE.md": '''# Saved release manifest: mvdan/sh v3.12.0
-
-Source: https://github.com/mvdan/sh/releases/tag/v3.12.0
-Tool: shfmt. Owner: mvdan. Repo: sh.
-Purpose: A shell parser and formatter.
-
-OS | Architecture | Release asset
-linux | amd64 | shfmt_v3.12.0_linux_amd64
-linux | arm64 | shfmt_v3.12.0_linux_arm64
-darwin | amd64 | shfmt_v3.12.0_darwin_amd64
-darwin | arm64 | shfmt_v3.12.0_darwin_arm64
-windows | amd64 | shfmt_v3.12.0_windows_amd64.exe
-
-Arkade receives x86_64/amd64, aarch64/arm64, and mingw64 as aliases.
-The assets are standalone binaries, not archives. The test image is offline;
-use this saved manifest instead of live release lookup. Do not pin v3.12.0
-in the registry: it is a test example, and arkade should still resolve latest.
-'''},
+        "category": "coding", "editable": [],
+        "prompt": "Add shfmt from mvdan/sh to arkade get. Follow AGENTS.md. Work in this checkout; do not commit or open a PR.",
+        "files": {},
     },
     "statement-redact": {
         "category": "document", "editable": ["redact_statement.py"],

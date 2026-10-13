@@ -22,7 +22,7 @@ jobs:
       - name: Verify controls and Python
         run: |
           python3 -m compileall -q quality_suite rigmark
-          python3 -m unittest quality_suite.test_governor quality_suite.test_tools -v
+          python3 -m unittest quality_suite.test_governor quality_suite.test_tools quality_suite.test_native_arkade -v
           ./rigmark quality selftest --arkade-root /tmp/arkade-source
       - name: Verify public receipt cards
         run: |
