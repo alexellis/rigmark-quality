@@ -1,0 +1,72 @@
+╭────────────────────────────────────────────────────────────────────────────╮
+│                                                                            │
+│  R I G M A R K   //   QUALITY TASK RECEIPT                                 │
+│  EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE               │
+│                                                                            │
+├─ MODEL ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  deepseek-v4-flash-0731                                                    │
+│                                                                            │
+├─ TASKS ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  TASK                        ARTEFACT  FINISHED  TIME     STOP             │
+│  python-expiry               yes       yes         19.6s normal            │
+│  node-idempotency            yes       yes         30.5s normal            │
+│  go-worker-pool              yes       yes        192.4s normal            │
+│  go-transfer-ledger          yes       yes         73.4s normal            │
+│  arkade-add                  no        yes        168.8s normal            │
+│  statement-redact            no        yes        225.2s normal            │
+│  stock-transfer              yes       yes          7.1s normal            │
+│  payment-recovery            yes       yes         10.4s normal            │
+│  ticket-routing              yes       yes          4.4s normal            │
+│  evidence-revisions          yes       yes          6.0s normal            │
+│  multilingual-evidence       yes       yes          6.5s normal            │
+│  long-context-retrieval      yes       yes         12.4s normal            │
+│  security-boundary           yes       yes         28.3s normal            │
+│                                                                            │
+│  Artefact and conversation completion are separate outcomes.               │
+│  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│                                                                            │
+├─ RUN ──────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  Tasks 13  ·  Suite 0.6  ·  SHA256 930fcb80c9e536c1…                       │
+│  Reasoning low  ·  Thinking default  ·  Output cap 32768                   │
+│  Turn cap none  ·  Time cap 1800s                                          │
+│                                                                            │
+╰────────────────────────────────────────────────────────────────────────────╯
+╭────────────────────────────────────────────────────────────────────────────╮
+│                                                                            │
+│  R I G M A R K   //   QUALITY TASK RECEIPT                                 │
+│  EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE               │
+│                                                                            │
+├─ MODEL ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  glm-5.3-flash                                                             │
+│                                                                            │
+├─ TASKS ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  TASK                        ARTEFACT  FINISHED  TIME     STOP             │
+│  python-expiry               yes       yes         10.2s normal            │
+│  node-idempotency            yes       yes         13.0s normal            │
+│  go-worker-pool              no        yes         79.5s normal            │
+│  go-transfer-ledger          yes       yes         50.4s normal            │
+│  arkade-add                  no        yes        120.0s normal            │
+│  statement-redact            no        yes         29.2s normal            │
+│  stock-transfer              yes       yes          3.1s normal            │
+│  payment-recovery            yes       yes          4.6s normal            │
+│  ticket-routing              yes       yes          1.9s normal            │
+│  evidence-revisions          yes       yes          1.9s normal            │
+│  multilingual-evidence       yes       yes          2.4s normal            │
+│  long-context-retrieval      yes       yes          3.7s normal            │
+│  security-boundary           yes       yes          5.0s normal            │
+│                                                                            │
+│  Artefact and conversation completion are separate outcomes.               │
+│  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│                                                                            │
+├─ RUN ──────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  Tasks 13  ·  Suite 0.6  ·  SHA256 930fcb80c9e536c1…                       │
+│  Reasoning low  ·  Thinking default  ·  Output cap 32768                   │
+│  Turn cap none  ·  Time cap 1800s                                          │
+│                                                                            │
+╰────────────────────────────────────────────────────────────────────────────╯

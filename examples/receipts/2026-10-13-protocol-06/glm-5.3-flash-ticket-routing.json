@@ -1,0 +1,62 @@
+{
+  "task": "ticket-routing",
+  "category": "tools",
+  "interpretation": "diagnostic_only",
+  "task_status": "experimental",
+  "suite_version": "0.6",
+  "suite_sha256": "930fcb80c9e536c177aaab182af8cd57e4978a6568b14b6c7450b897ea10f159",
+  "task_sha256": "7b9afb104c94d26b0907b68bddbc723cabe39d9d5711bec509e94a79ebfcb668",
+  "request": {
+    "temperature": 0,
+    "top_p": 1,
+    "seed": 20261011,
+    "max_tokens": 32768,
+    "max_steps": 0,
+    "task_seconds": 1800,
+    "reasoning_effort": "low",
+    "thinking": "default"
+  },
+  "arkade_revision": null,
+  "runtime_image_id": "sha256:086fd83ccb51eb829065ab6ba2642fa96dd6a2328a99a8f891d7ade821385188",
+  "requested_model": "glm-5.3-flash",
+  "observed_models": [
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4"
+  ],
+  "model_match": true,
+  "started_at": "2026-10-13T06:56:44.990738+00:00",
+  "finished_at": "2026-10-13T06:56:46.852642+00:00",
+  "elapsed_seconds": 1.9,
+  "usage": {
+    "prompt_tokens": 1473,
+    "completion_tokens": 89,
+    "reasoning_tokens": 0
+  },
+  "reasoning_diagnostics": {
+    "characters": 2,
+    "repeated_trigram_fraction": 0.0,
+    "loop_detected": false
+  },
+  "tool_diagnostics": {
+    "parsed_calls": 2,
+    "invalid_calls": 0,
+    "no_call_or_answer": false,
+    "unfinished_after_tool": false,
+    "unparsed_tool_markup": false
+  },
+  "steps": 3,
+  "checks": {
+    "target": true,
+    "others_unchanged": true,
+    "authorised_calls_only": true,
+    "searched_first": true,
+    "reported_id": true
+  },
+  "artefact_passed": true,
+  "conversation_finished": true,
+  "passed": true,
+  "failure": null,
+  "receipt_kind": "public_summary",
+  "source_note": "13 October 2026 complete protocol 0.6 run. Conversation, tool calls, file diffs, and endpoint details omitted."
+}

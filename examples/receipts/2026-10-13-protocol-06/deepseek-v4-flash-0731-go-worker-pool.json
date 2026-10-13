@@ -1,0 +1,73 @@
+{
+  "task": "go-worker-pool",
+  "category": "coding",
+  "interpretation": "diagnostic_only",
+  "task_status": "experimental",
+  "suite_version": "0.6",
+  "suite_sha256": "930fcb80c9e536c177aaab182af8cd57e4978a6568b14b6c7450b897ea10f159",
+  "task_sha256": "708c77fde529a29156998b1307b5294912874632580f825400b8487fad94f76e",
+  "request": {
+    "temperature": 0,
+    "top_p": 1,
+    "seed": 20261011,
+    "max_tokens": 32768,
+    "max_steps": 0,
+    "task_seconds": 1800,
+    "reasoning_effort": "low",
+    "thinking": "default"
+  },
+  "arkade_revision": null,
+  "runtime_image_id": "sha256:086fd83ccb51eb829065ab6ba2642fa96dd6a2328a99a8f891d7ade821385188",
+  "requested_model": "deepseek-v4-flash-0731",
+  "observed_models": [
+    "deepseek-v4-flash-0731",
+    "deepseek-v4-flash-0731",
+    "deepseek-v4-flash-0731",
+    "deepseek-v4-flash-0731",
+    "deepseek-v4-flash-0731",
+    "deepseek-v4-flash-0731",
+    "deepseek-v4-flash-0731",
+    "deepseek-v4-flash-0731",
+    "deepseek-v4-flash-0731",
+    "deepseek-v4-flash-0731",
+    "deepseek-v4-flash-0731",
+    "deepseek-v4-flash-0731",
+    "deepseek-v4-flash-0731",
+    "deepseek-v4-flash-0731",
+    "deepseek-v4-flash-0731"
+  ],
+  "model_match": true,
+  "started_at": "2026-10-13T06:52:24.899756+00:00",
+  "finished_at": "2026-10-13T06:55:37.339609+00:00",
+  "elapsed_seconds": 192.4,
+  "usage": {
+    "prompt_tokens": 60816,
+    "completion_tokens": 5254,
+    "reasoning_tokens": 0
+  },
+  "reasoning_diagnostics": {
+    "characters": 11240,
+    "repeated_trigram_fraction": 0.21,
+    "loop_detected": false
+  },
+  "tool_diagnostics": {
+    "parsed_calls": 17,
+    "invalid_calls": 0,
+    "no_call_or_answer": false,
+    "unfinished_after_tool": false,
+    "unparsed_tool_markup": false
+  },
+  "steps": 15,
+  "checks": {
+    "acceptance": true,
+    "public_tests": true,
+    "regression_test_added": true,
+    "gofmt": true
+  },
+  "artefact_passed": true,
+  "conversation_finished": true,
+  "passed": true,
+  "failure": null,
+  "receipt_kind": "public_summary",
+  "source_note": "13 October 2026 complete protocol 0.6 run. Conversation, tool calls, file diffs, and endpoint details omitted."
+}

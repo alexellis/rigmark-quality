@@ -24,7 +24,10 @@ jobs:
           python3 -m compileall -q quality_suite rigmark
           python3 -m unittest quality_suite.test_governor quality_suite.test_tools -v
           ./rigmark quality selftest --arkade-root /tmp/arkade-source
-      - name: Render public pilot cards
+      - name: Verify public receipt cards
         run: |
-          ./rigmark quality report --output examples/receipts/2026-10-11-pilot > /tmp/cards.txt
-          diff -u examples/receipts/2026-10-11-pilot/cards.txt /tmp/cards.txt
+          for directory in examples/receipts/*; do
+            test -f "$directory/cards.txt" || continue
+            ./rigmark quality report --output "$directory" > /tmp/cards.txt
+            diff -u "$directory/cards.txt" /tmp/cards.txt
+          done

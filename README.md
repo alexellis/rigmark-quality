@@ -176,21 +176,34 @@ On every push to `master` and pull request, the [check workflow](.github/workflo
 clones the pinned arkade revision, builds the Docker test image, compiles the
 Python code, runs the governor unit tests, and runs `selftest`. That control
 run checks the reference and deliberately broken cases for all 13 tasks.
-CI also regenerates the historical pilot cards and checks that they match the
-committed text. It does not call a model endpoint or measure model quality.
+CI also regenerates every committed receipt card and checks that it matches
+the JSON summaries. It does not call a model endpoint or measure model quality.
 The separate [release-assets workflow](.github/workflows/release-assets.yml)
 packages the CLI and checksum only when a release is published.
 
-## First receipts
+## Receipts
 
-The [11 October pilot cards](examples/receipts/2026-10-11-pilot/cards.txt)
-and [public JSON summaries](examples/receipts/2026-10-11-pilot/) show DeepSeek
-V4 Flash, GLM-5.3-Flash, and Qwen3.8-27B FP8 task outcomes. They are **historical
-protocol 0.1 examples**, with different thinking settings across models. Their
-arkade task used a fictional CLI, so those observations are not results for
-the current shfmt task. The summaries omit private conversation traces; use
-them to see the receipt format, not to rank the models. We will add matched
-runs on the current protocol as it settles.
+The [13 October protocol 0.6 cards](examples/receipts/2026-10-13-protocol-06/cards.txt)
+and [public JSON summaries](examples/receipts/2026-10-13-protocol-06/) record
+fresh, complete 13-task runs for GLM-5.3-Flash and DeepSeek V4 Flash 0731. Both
+used the same suite hash, runtime image, request limits, and `low` reasoning
+setting. The cards show each task's artefact result and whether the model
+finished its conversation; the JSON gives the individual checks and stop
+reasons. Full tool traces are kept private.
+
+These are single attempts in the suite's restricted typed-tool harness, not
+ordinary OpenCode sessions, a model ranking, or a complete quality check.
+GLM's worker-pool, arkade, and statement-redaction artefacts failed independent
+checks. DeepSeek's arkade and statement-redaction artefacts failed. See the
+[receipt notes](examples/receipts/2026-10-13-protocol-06/README.md) for the
+specific failures and limits on interpretation.
+
+A [native OpenCode control](examples/agent-trials/2026-10-13-shfmt.md) used
+fresh Slicer VMs, the same pre-shfmt arkade revision, and a short request to
+follow `AGENTS.md`. DeepSeek passed the independent arkade acceptance check on
+its initial run; GLM passed after a review follow-up fixed architecture aliases.
+The contrast is why the restricted `arkade-add` row should not be read as a
+claim about ordinary coding-agent performance.
 
 ## Help shape the suite
 

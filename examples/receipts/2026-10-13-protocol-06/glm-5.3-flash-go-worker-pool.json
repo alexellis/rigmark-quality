@@ -1,0 +1,71 @@
+{
+  "task": "go-worker-pool",
+  "category": "coding",
+  "interpretation": "diagnostic_only",
+  "task_status": "experimental",
+  "suite_version": "0.6",
+  "suite_sha256": "930fcb80c9e536c177aaab182af8cd57e4978a6568b14b6c7450b897ea10f159",
+  "task_sha256": "708c77fde529a29156998b1307b5294912874632580f825400b8487fad94f76e",
+  "request": {
+    "temperature": 0,
+    "top_p": 1,
+    "seed": 20261011,
+    "max_tokens": 32768,
+    "max_steps": 0,
+    "task_seconds": 1800,
+    "reasoning_effort": "low",
+    "thinking": "default"
+  },
+  "arkade_revision": null,
+  "runtime_image_id": "sha256:086fd83ccb51eb829065ab6ba2642fa96dd6a2328a99a8f891d7ade821385188",
+  "requested_model": "glm-5.3-flash",
+  "observed_models": [
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4"
+  ],
+  "model_match": true,
+  "started_at": "2026-10-13T06:51:58.015793+00:00",
+  "finished_at": "2026-10-13T06:53:17.565469+00:00",
+  "elapsed_seconds": 79.5,
+  "usage": {
+    "prompt_tokens": 26767,
+    "completion_tokens": 2125,
+    "reasoning_tokens": 540
+  },
+  "reasoning_diagnostics": {
+    "characters": 2258,
+    "repeated_trigram_fraction": 0.102,
+    "loop_detected": false
+  },
+  "tool_diagnostics": {
+    "parsed_calls": 13,
+    "invalid_calls": 0,
+    "no_call_or_answer": false,
+    "unfinished_after_tool": false,
+    "unparsed_tool_markup": false
+  },
+  "steps": 13,
+  "checks": {
+    "acceptance": false,
+    "public_tests": true,
+    "regression_test_added": true,
+    "gofmt": true
+  },
+  "artefact_passed": false,
+  "conversation_finished": true,
+  "passed": false,
+  "failure": null,
+  "receipt_kind": "public_summary",
+  "source_note": "13 October 2026 complete protocol 0.6 run. Conversation, tool calls, file diffs, and endpoint details omitted."
+}
