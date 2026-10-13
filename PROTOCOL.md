@@ -1,6 +1,6 @@
 # Experimental quality protocol
 
-Protocol 0.4 uses thirteen fixed tasks. It is a diagnostic suite, not a
+Protocol 0.6 uses thirteen fixed tasks. It is a diagnostic suite, not a
 quality score. A receipt is one model attempt on one task. It records the
 requested and observed model, the complete request settings, task/suite
 hashes, runtime image, elapsed time, tool calls, file diffs, independent
@@ -16,9 +16,12 @@ provider may reject or lower the requested response limit. Budget stops are
 recorded separately from independent task checks.
 
 The governor gives one recorded reminder after repeated unchanged reads,
-searches, or green tests. A later repeat stops as no progress. After the
-attempt stops, the judge reruns the public tests against the final files and
-runs checks withheld from the agent. These checks are public and may enter
+searches, or green tests. A fourth identical unchanged read or search stops
+as no progress; repeated green tests only produce a reminder. Repository
+exploration receives a reminder after 25 turns without an edit, but has no
+separate turn deadline. After the attempt stops, the judge reruns the public
+tests against the final files and runs checks withheld from the agent. These
+checks are public and may enter
 training data. It reports file artefact correctness separately from whether
 the conversation reached a final answer.
 A task can have correct code and an unfinished conversation.
@@ -29,6 +32,13 @@ and typed tools; it does not see acceptance tests during the run. This restricte
 interface is a significant harness choice. It should not be treated as an
 ordinary OpenCode or terminal-agent result. The document and refusal tasks
 remain exploratory. The refusal check is a smoke test, not a cyber benchmark.
+
+The arkade public check enforces gofmt, requires a Go test in the new test
+file, and runs the whole `pkg/get` package. This avoids a successful exit
+when a narrow `-run` filter selects no tests. Its file search accepts literal
+text while tolerating Go's aligned whitespace. The five-platform release URL
+check remains independent and withheld until after the attempt. File search
+also accepts a directory path and returns matches with source filenames.
 
 Receipts are comparable only when suite hash, task hash, model/backend,
 reasoning setting, limits, and harness match. Repeat tasks from fresh

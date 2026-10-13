@@ -1,7 +1,7 @@
 """Deterministic progress limits for agent-style quality tasks.
 
-The governor sees public tool results, not hidden acceptance checks.  It may
-send one recorded reminder before stopping an unchanged repetition pattern.
+The governor sees public tool results, not hidden acceptance checks. It stops
+only exact, unchanged read/search loops; other repetition receives a reminder.
 """
 from collections import Counter
 import hashlib
@@ -54,18 +54,14 @@ class Governor:
                     'Governor: public tests passed twice with no intervening edit. '
                     'Check the requested deliverables once and give your final answer. '
                     'Do not rerun the same passing test without new evidence.'), None
-            if count >= 3:
-                return None, 'no_progress: repeated passing tests without an edit'
         return None, None
 
     def exploration(self, step, edited):
-        """Bound repository-reading loops on coding tasks."""
+        """Remind an agent to make progress without imposing a turn deadline."""
         if not self.editable or edited:
             return None, None
         if step == 25:
             return self._notice('exploration_budget',
                 'Governor: 25 model turns have passed without an edit. '
                 'Use the repository evidence gathered so far and implement the task.'), None
-        if step >= 40:
-            return None, 'no_progress: 40 model turns without an edit'
         return None, None

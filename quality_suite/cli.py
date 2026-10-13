@@ -321,7 +321,7 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
               'interpretation': 'diagnostic_only',
               'task_status': ('exploratory' if task_id == 'statement-redact'
                               else 'experimental'),
-              'suite_version': '0.4', 'suite_sha256': active_suite_hash,
+              'suite_version': '0.6', 'suite_sha256': active_suite_hash,
               'task_sha256': task_hash,
               'request': {'temperature': 0, 'top_p': 1, 'seed': 20261011,
                           'max_tokens': max_output_tokens, 'max_steps': max_steps,
@@ -385,6 +385,19 @@ def selftest(root, arkade_root, image):
             'reference': {'public_tests': reference_checks['public_tests']},
             'broken': {'public_tests': broken_checks['public_tests'],
                        'acceptance': broken_checks['acceptance']}}
+    with tempfile.TemporaryDirectory(prefix='rigmark-arkade-test-control-') as directory:
+        parent = Path(directory)
+        workspace = make_workspace('arkade-add', parent, arkade_root)
+        tasks.reference('arkade-add', workspace)
+        tools.ToolBox('arkade-add', workspace, image).call('format_go', '{}')
+        (workspace / 'pkg/get/rigmark_test.go').write_text(
+            'package get\n\nimport "testing"\n\n'
+            'func Test_DownloadShfmt(t *testing.T) {\n\tt.Fatal("must run")\n}\n')
+        result = runtime.run(workspace, image, runtime.public_command('arkade-add'), 180)
+        ran_test = result['exit_code'] != 0 and 'must run' in result['output']
+        outcomes['arkade-public-test-control'] = {
+            'reference': {'alternate_test_name_runs': ran_test},
+            'broken': {'false_green': not ran_test}}
     with tempfile.TemporaryDirectory(prefix='rigmark-bank-controls-') as directory:
         workspace = Path(directory)
         shutil.copyfile(Path(__file__).parent / 'bank_statement.py',

@@ -49,7 +49,12 @@ workspace omits `.git`, so an agent cannot inspect the later solution in its
 history. A model may have seen arkade's real shfmt change during training, so
 a pass can reflect recall rather than repository reasoning. Public tasks and
 checks can likewise enter future training data. We do not download or execute
-release binaries during the test.
+release binaries during the test. Its public check formats the Go files,
+requires a test in the new test file,
+and runs the full offline `pkg/get` package. The independent check verifies
+release URLs for five platforms. Search tolerates Go's aligned whitespace
+and accepts directory paths. The task has no separate repository-exploration
+turn limit.
 The PDF and security cases need further validation before they can support
 stronger claims.
 
@@ -147,8 +152,9 @@ check the observed model and failure fields before comparing results.
 
 The default run is bounded by **30 minutes per task** and requests up to
 **32,768 output tokens per response**. There is no model-turn cap by default;
-the governor still stops repeated no-progress behaviour. Use `--max-steps N`
-for an explicit turn limit, or `--seconds N` and `--max-output-tokens N` to
+the governor still stops an exact read or search repeated four times without
+an edit. Use `--max-steps N` for an explicit turn limit, or `--seconds N` and
+`--max-output-tokens N` to
 adjust the other limits. A provider may enforce a lower output limit. Report
 the requested limits and distinguish a budget stop from a failed task check.
 

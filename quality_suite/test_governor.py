@@ -28,7 +28,7 @@ class GovernorTests(unittest.TestCase):
         self.assertEqual(self.guard.observe(call)[1],
                          'no_progress: repeated unchanged read/search')
 
-    def test_repeated_green_tests_stop_without_a_new_edit(self):
+    def test_repeated_green_tests_remind_without_stopping(self):
         call = {'name': 'run_tests', 'arguments': '{}',
                 'result': {'exit_code': 0, 'timeout': False}}
         self.assertEqual(self.guard.observe(call), (None, None))
@@ -38,8 +38,14 @@ class GovernorTests(unittest.TestCase):
         (self.root / 'candidate.go').write_text('after')
         self.assertEqual(self.guard.observe(call), (None, None))
         self.assertEqual(self.guard.observe(call)[1], None)
-        self.assertEqual(self.guard.observe(call)[1],
-                         'no_progress: repeated passing tests without an edit')
+        self.assertEqual(self.guard.observe(call), (None, None))
+
+    def test_exploration_reminds_without_a_turn_limit(self):
+        reminder, stop = self.guard.exploration(25, False)
+        self.assertIsNone(stop)
+        self.assertIn('25 model turns', reminder or '')
+        self.assertEqual(self.guard.exploration(40, False), (None, None))
+        self.assertEqual(self.guard.exploration(100, False), (None, None))
 
     def test_failed_tests_do_not_count_as_green(self):
         call = {'name': 'run_tests', 'arguments': '{}',

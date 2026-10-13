@@ -13,9 +13,10 @@ def function(name, description, **properties):
 
 S = {'type':'string'}
 I = {'type':'integer'}
-FILES = [function('list_files','List workspace files by glob or literal substring; empty pattern lists all; maximum 100 results.',pattern=S),
+FILES = [function('list_files','List workspace files by glob or literal substring; omit pattern to list all; maximum 100 results.',pattern=S),
          function('read_file','Read a workspace text file. Offset is zero-based line number; limit is 1 to 250 lines.',path=S,offset=I,limit=I),
-         function('search_files','Find a literal string in a workspace file, with line numbers (maximum 80 matches).',path=S,text=S)]
+         function('search_files','Find a case-sensitive literal in a workspace file or directory, with line numbers (maximum 80 matches). Spaces in the query match any run of whitespace on a line.',path=S,text=S)]
+FILES[0]['function']['parameters']['required'] = []
 EDITS = [function('write_file','Write one allowed workspace file. UTF-8 text only.',path=S,content=S),
          function('apply_patch','Replace exactly one occurrence of old with new in an allowed file; fails if not unique.',path=S,old=S,new=S),
          function('run_tests','Run the public tests in an offline Docker container. This does not run hidden acceptance tests.')]
@@ -34,10 +35,10 @@ PAYMENTS = [function('payment_lookup','Read the simulator ledger status by invoi
 def validate(args, schema):
     if not isinstance(args,dict):
         raise ValueError('arguments must be an object')
-    if set(args) != set(schema['properties']):
+    if not set(schema['required']) <= set(args) <= set(schema['properties']):
         raise ValueError('expected fields: '+', '.join(schema['properties']))
-    for key,spec in schema['properties'].items():
-        value=args[key]
+    for key,value in args.items():
+        spec=schema['properties'][key]
         if spec['type']=='string' and not isinstance(value,str):
             raise ValueError(key+' must be a string')
         if spec['type']=='integer' and type(value) is not int:
@@ -92,7 +93,7 @@ class ToolBox:
 
     def execute(self,name,a):
         if name=='list_files':
-            pattern = a['pattern']
+            pattern = a.get('pattern', '')
             glob = any(char in pattern for char in '*?[')
             files = []
             for p in sorted(self.workspace.rglob('*')):
@@ -112,7 +113,21 @@ class ToolBox:
             lines=self.path(a['path']).read_text().splitlines()
             return {'total_lines':len(lines),'text':'\n'.join(f'{i+1}: {v}' for i,v in enumerate(lines) if a['offset']<=i<a['offset']+a['limit'])[:20000]}
         if name=='search_files':
-            return {'matches':[f'{i+1}: {line}' for i,line in enumerate(self.path(a['path']).read_text().splitlines()) if a['text'] in line][:80]}
+            query = re.compile(re.escape(a['text']).replace(r'\ ', r'\s+'))
+            source = self.path(a['path'])
+            files = sorted(source.rglob('*')) if source.is_dir() else [source]
+            matches = []
+            for candidate in files:
+                if (not candidate.is_file() or candidate.is_symlink()
+                        or 'vendor' in candidate.parts or candidate.stat().st_size > 1000000):
+                    continue
+                label = str(candidate.relative_to(self.workspace)) + ':' if source.is_dir() else ''
+                for i,line in enumerate(candidate.read_text(errors='replace').splitlines(), 1):
+                    if query.search(line):
+                        matches.append(f'{label}{i}: {line}')
+                        if len(matches) == 80:
+                            return {'matches':matches}
+            return {'matches':matches}
         if name in ('write_file','apply_patch'):
             p=self.path(a['path'],True)
             if name=='write_file': content=a['content']
