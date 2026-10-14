@@ -27,6 +27,11 @@
 │  Artefact and conversation completion are separate outcomes.               │
 │  Read the JSON receipt for checks, tool calls, and stop reasons.           │
 │                                                                            │
+├─ FAILED CHECKS ────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  arkade-add: acceptance                                                    │
+│  statement-redact: public, hidden-1, hidden-2                              │
+│                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │  Tasks 13  ·  Suite 0.6  ·  SHA256 930fcb80c9e536c1…                       │
@@ -62,6 +67,12 @@
 │                                                                            │
 │  Artefact and conversation completion are separate outcomes.               │
 │  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│                                                                            │
+├─ FAILED CHECKS ────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  go-worker-pool: acceptance                                                │
+│  arkade-add: acceptance                                                    │
+│  statement-redact: hidden-1, hidden-2                                      │
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
