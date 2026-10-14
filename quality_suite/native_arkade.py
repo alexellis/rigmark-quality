@@ -67,7 +67,7 @@ def grade(candidate, original, image):
                             if changed else 'true', 30)
     with tempfile.TemporaryDirectory(prefix='rigmark-arkade-judge-') as directory:
         judged = Path(directory) / 'candidate'
-        shutil.copytree(candidate, judged)
+        shutil.copytree(candidate, judged, symlinks=True)
         for name, content in evaluators.files('arkade-add', Path(original)).items():
             target = judged / name
             target.parent.mkdir(parents=True, exist_ok=True)
