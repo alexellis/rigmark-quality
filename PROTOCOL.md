@@ -1,6 +1,6 @@
 # Experimental quality protocol
 
-Protocol 0.7 uses thirteen fixed tasks. It is a diagnostic suite, not a
+Protocol 0.8 uses thirteen fixed tasks. It is a diagnostic suite, not a
 quality score. A receipt is one model attempt on one task. It records the
 requested and observed model, the complete request settings, task/suite
 hashes, runtime image, elapsed time, tool calls, file diffs, independent
@@ -31,13 +31,17 @@ Docker socket. That interface is a significant harness choice; its results
 are not ordinary terminal-agent results. The document and refusal tasks
 remain exploratory. The refusal check is a smoke test, not a cyber benchmark.
 
-`arkade-add` is a native-agent task. A fresh, tagged Slicer VM runs OpenCode
-against the entire pinned arkade checkout with its real `AGENTS.md` and a
-short request to add shfmt. The agent can use its terminal, inspect upstream
+`arkade-add` is a native-agent task. By default, a disposable Docker container
+runs OpenCode against the entire pinned arkade checkout with its real
+`AGENTS.md` and a short request to add shfmt. An optional fresh, tagged Slicer
+VM can run the same task. The agent can use its terminal, inspect upstream
 releases, and run downloads. Its primary and small model are pinned to the
-same contender. The VM is deleted after collection by default. Only after
-the agent stops does the offline Docker judge run the full `pkg/get` package,
-check a Go test in any changed test file, enforce gofmt and the README entry,
+same contender. The Docker runner copies only that provider's OpenCode settings
+and credentials into a temporary home; the agent cannot mount the host home or
+Docker socket. Both runners use a fresh checkout and remove it after the run
+by default. Only after the agent stops does the offline Docker judge run the
+full `pkg/get` package, check a Go test in any changed test file, enforce
+gofmt and the README entry,
 and inject independent release-URL checks. These include architecture aliases
 and a second version tag. The old typed-tool arkade receipts remain historical
 protocol 0.6 observations; they are not native-agent results.
@@ -45,10 +49,14 @@ protocol 0.6 observations; they are not native-agent results.
 OpenCode's provider configuration controls its sampling and response token
 limits, so its receipt does not claim the typed-tool task's fixed sampling
 settings. `--seconds` is shared; `--reasoning-effort` becomes an OpenCode
-variant for this task. Do not compare the two harnesses as though identical.
+variant for this task. The Docker receipt preserves the event log and marks an
+incomplete OpenCode session export as partial; model IDs are checked against
+the available session and message headers. Do not compare the two harnesses
+as though identical.
 
 Receipts are comparable only when suite hash, task hash, model/backend,
-reasoning setting, limits, and harness match. Repeat tasks from fresh
+reasoning setting, limits, and harness match. Docker and Slicer native-agent
+receipts identify their distinct harnesses. Repeat tasks from fresh
 workspaces. Preserve failures and timeouts rather than excluding them from a
 report. Describe the checkpoint, quantisation, serving engine, and hardware
 alongside public results, or link a RigMark bench receipt.

@@ -19,6 +19,11 @@ jobs:
           git -C /tmp/arkade-source checkout --detach e5215097ce8d9340af060412663f7c7130c594dd
       - name: Build offline runtime
         run: docker build -t rigmark-quality-runtime:0.4 quality_suite
+      - name: Build native agent runtime
+        run: |
+          docker build -f quality_suite/Dockerfile.agent -t rigmark-quality-agent:0.8 quality_suite
+          docker run --rm rigmark-quality-agent:0.8 --version
+          docker run --rm --entrypoint go rigmark-quality-agent:0.8 version
       - name: Verify controls and Python
         run: |
           python3 -m compileall -q quality_suite rigmark

@@ -4,8 +4,9 @@
 
 **Small coding and tool tasks, independently checked.** Most tasks use a
 restricted typed-tool harness. `arkade-add` runs a real OpenCode coding agent
-inside a fresh Slicer VM with the complete repository, its `AGENTS.md`, and a
-terminal. The receipt identifies which harness ran each task.
+inside a disposable Docker container with the complete repository, its
+`AGENTS.md`, and a terminal. Slicer remains an optional agent runner. The
+receipt identifies which harness ran each task.
 
 This is **experimental**. Its thirteen tasks are a diagnostic starting point,
 not a complete quality test of a model, a quantisation, or an agent product.
@@ -48,11 +49,11 @@ checkout from before arkade added it. The agent sees the entire repository and
 the short prompt: “Add shfmt from mvdan/sh to arkade get. Follow AGENTS.md.
 Work in this checkout; do not commit or open a PR.” It can inspect releases,
 run commands, and download binaries as arkade's instructions require. After
-the agent stops, the suite copies its checkout out of the VM. An offline Docker
+the agent stops, the suite judges its disposable checkout. An offline Docker
 judge runs `pkg/get` tests and independent release-URL checks, accepts a Go
 test in any changed `*_test.go` file, and checks the README and Go formatting.
-The model never sees those independent checks during its attempt. The VM is
-deleted after the receipt is captured unless `--keep-agent-vm` is set.
+The model never sees those independent checks during its attempt. The Docker
+container and checkout are deleted after the receipt is captured.
 
 A model may have seen arkade's later shfmt change during training, so a pass
 can reflect recall rather than repository reasoning. Public tasks and checks
@@ -70,12 +71,16 @@ include a runnable tarball and a SHA-256 checksum. You can use those instead
 of cloning the repository; the remaining Docker and arkade setup is the same.
 See [RELEASING.md](RELEASING.md) for the release process.
 
-Use a host with Slicer, OpenCode credentials, and Docker Community Edition.
-`arkade-add` creates its own disposable [Slicer VM](https://github.com/slicervm/agent-skills).
-Docker runs public and withheld checks
-with networking disabled, a read-only root, and resource limits. Start with a
-fresh VM or cold fork for each model and keep credentials out of reusable
-snapshots.
+Use a host with Docker Community Edition and OpenCode configured for the
+model you want to test, including credentials if its provider requires them.
+All 13 tasks run without Slicer. The native arkade
+agent runs in a disposable Docker container with network access for its model
+and release lookups. It receives only the selected OpenCode provider settings
+and credentials in a temporary home; it cannot access the host's Docker socket
+or home directory. The separate Docker judge runs public and withheld checks
+with networking disabled, a read-only root, and resource limits. The native
+agent can read its selected provider credential, so use an endpoint and account
+you trust for agent execution.
 
 ```sh
 git clone https://github.com/alexellis/rigmark-quality
@@ -85,6 +90,7 @@ git clone https://github.com/alexellis/arkade /tmp/rigmark-quality-arkade
 git -C /tmp/rigmark-quality-arkade checkout --detach e5215097ce8d9340af060412663f7c7130c594dd
 
 docker build -t rigmark-quality-runtime:0.4 quality_suite
+docker build -f quality_suite/Dockerfile.agent -t rigmark-quality-agent:0.8 quality_suite
 ./rigmark quality list
 ./rigmark quality selftest --arkade-root /tmp/rigmark-quality-arkade
 ```
@@ -95,7 +101,7 @@ not a RigMark Quality card or model receipt. Run it once after setting up the
 test image; a successful exit means the harness controls passed.
 
 **Run the full 13-task suite** by leaving out `--task`. Twelve tasks use fresh
-typed-tool workspaces; `arkade-add` launches a fresh OpenCode VM. The run
+typed-tool workspaces; `arkade-add` launches a fresh OpenCode container. The run
 prints one JSON status line per task; `report` combines that run's receipts
 into a shareable ASCII card. Keep each full run in a new output directory so
 old receipts do not get mixed into its card.
@@ -125,7 +131,14 @@ result. The other twelve tasks use OpenAI-compatible chat completions and
 typed tools. `arkade-add` uses OpenCode in its normal terminal-enabled agent
 mode. When using `--endpoint` for a full run, configure that endpoint in
 OpenCode and provide `--agent-model`; the native task cannot infer OpenCode
-configuration from an endpoint URL. `--seconds` limits both harnesses.
+configuration from an endpoint URL. For Docker, use `--agent-config-file` and
+`--agent-auth-file` if OpenCode's configuration or auth JSON is outside its
+standard location. `--seconds` limits both harnesses.
+For a model server running on the Docker host, configure its OpenCode provider
+URL as `http://host.docker.internal:PORT/v1`; `localhost` inside the agent
+container refers to the container itself. `--agent-runner slicer` remains
+available for hosts with Slicer installed. It creates a fresh VM and deletes
+it after collecting the receipt unless `--keep-agent-vm` is set.
 `--max-steps` and `--thinking` apply only to typed-tool tasks and cannot be
 set when `arkade-add` is selected. `--reasoning-effort` maps to OpenCode's
 `--variant` for the native task; verify provider support. OpenCode controls
@@ -181,8 +194,9 @@ with a RigMark bench receipt.
 ## What CI checks
 
 On every push to `master` and pull request, the [check workflow](.github/workflows/check.yml)
-clones the pinned arkade revision, builds the Docker test image, compiles the
-Python code, runs the governor unit tests, and runs `selftest`. That control
+clones the pinned arkade revision, builds both Docker images, checks the
+OpenCode and Go versions, compiles the Python code, runs the governor unit
+tests, and runs `selftest`. That control
 run checks the reference and deliberately broken cases for all 13 tasks,
 including the native arkade artefact grader. It does not launch OpenCode.
 CI also regenerates every committed receipt card and checks that it matches

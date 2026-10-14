@@ -1,0 +1,10 @@
+FROM ghcr.io/anomalyco/opencode:1.18.32@sha256:b3ce2a73474c57d19abb8c1e9d955c66066b4263e8f15167ba6e6c5ddf9a7ee0 AS opencode
+
+FROM golang:1.26-alpine@sha256:8ac98ca534ac3f51e1f420a1dd2c15e74c75cfa0f23f3ad27eb5d7236c349a0c
+RUN apk add --no-cache bash ca-certificates curl file git jq libstdc++
+COPY --from=opencode /usr/local/bin/opencode /usr/local/bin/opencode
+RUN adduser -D -u 1000 agent
+USER agent
+ENV HOME=/home/agent
+WORKDIR /workspace
+ENTRYPOINT ["opencode"]

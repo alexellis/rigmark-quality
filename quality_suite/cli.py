@@ -30,7 +30,8 @@ def utc_now():
 def suite_hash():
     digest = hashlib.sha256()
     root = Path(__file__).parent
-    paths = list(root.glob('*.py')) + list((root / 'fixtures').glob('*')) + [root / 'Dockerfile']
+    paths = (list(root.glob('*.py')) + list((root / 'fixtures').glob('*'))
+             + [root / 'Dockerfile', root / 'Dockerfile.agent'])
     for path in sorted(p for p in paths if p.is_file()):
         digest.update(str(path.relative_to(root)).encode())
         digest.update(path.read_bytes())
@@ -180,7 +181,7 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
              max_steps, seconds, reasoning_effort, thinking,
              max_output_tokens=32768, api_key_env=None):
     if task_id == 'arkade-add':
-        raise ValueError('arkade-add requires the native Slicer OpenCode runner')
+        raise ValueError('arkade-add requires the native OpenCode runner')
     active_suite_hash = suite_hash()
     workspace = make_workspace(task_id, root, arkade_root)
     originals = {path: (workspace / path).read_text() if (workspace / path).exists() else ''
@@ -307,7 +308,7 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
               'interpretation': 'diagnostic_only',
               'task_status': ('exploratory' if task_id == 'statement-redact'
                               else 'experimental'),
-              'suite_version': '0.7', 'suite_sha256': active_suite_hash,
+              'suite_version': '0.8', 'suite_sha256': active_suite_hash,
               'task_sha256': task_hash,
               'request': {'temperature': 0, 'top_p': 1, 'seed': 20261011,
                           'max_tokens': max_output_tokens, 'max_steps': max_steps,
@@ -530,7 +531,8 @@ def report(output, format='ascii'):
             else:
                 row[model] = None
         rows.append(row)
-    summary = {'suite_version': '0.4', 'interpretation': 'diagnostic_only',
+    summary = {'suite_version': receipts[0].get('suite_version', '?'),
+               'interpretation': 'diagnostic_only',
                'models': models, 'tasks': rows}
     print(json.dumps(summary, indent=2))
 
@@ -539,9 +541,9 @@ def ascii_card(key, receipts):
     """A compact per-model receipt; no overall model-quality score."""
     suite_hash, model, _ = key
     typed_receipt = next((r for r in receipts
-                          if r.get('harness') != 'slicer-opencode-native'), None)
+                          if not r.get('harness', '').endswith('opencode-native')), None)
     request_settings = (typed_receipt or receipts[0]).get('request', {})
-    native = any(r.get('harness') == 'slicer-opencode-native' for r in receipts)
+    native = any(r.get('harness', '').endswith('opencode-native') for r in receipts)
     width = 78
     inner = width - 4
     lines = ['╭' + '─' * (width - 2) + '╮']
@@ -604,8 +606,11 @@ def ascii_card(key, receipts):
         row(f"Turn cap {'none' if turn_limit == 0 else turn_limit}"
             f"  ·  time cap {request_settings.get('task_seconds', '?')}s")
     if native:
-        agent = next(r for r in receipts if r.get('harness') == 'slicer-opencode-native')
-        row(f"Arkade: OpenCode in fresh Slicer VM · {agent.get('agent_model', '?')}")
+        agent = next(r for r in receipts
+                     if r.get('harness', '').endswith('opencode-native'))
+        location = ('Docker container' if agent['harness'].startswith('docker-')
+                    else 'Slicer VM')
+        row(f"Arkade: OpenCode in fresh {location} · {agent.get('agent_model', '?')}")
         row(f"Agent variant {agent.get('agent_variant') or 'default'}"
             f"  ·  time cap {agent.get('request', {}).get('task_seconds', '?')}s")
     row()
@@ -619,6 +624,10 @@ def main():
                         choices=['list', 'selftest', 'run', 'report'])
     parser.add_argument('--arkade-root', type=Path, default=Path('/home/ubuntu/arkade-source'))
     parser.add_argument('--image', default=runtime.DEFAULT_IMAGE)
+    parser.add_argument('--agent-image', default=native_arkade.DEFAULT_AGENT_IMAGE,
+                        help='Docker image with OpenCode and Go for arkade-add')
+    parser.add_argument('--agent-runner', choices=['docker', 'slicer'],
+                        default='docker', help='Native arkade agent runner (default: docker)')
     parser.add_argument('--model', action='append')
     parser.add_argument('--task', action='append', choices=tasks.TASKS)
     parser.add_argument('--output', type=Path, default=Path('quality-results'))
@@ -630,7 +639,9 @@ def main():
     parser.add_argument('--agent-model',
                         help='OpenCode provider/model for the native arkade task; with --toilgate, defaults to toilgate/MODEL_ID')
     parser.add_argument('--agent-config-file', type=Path,
-                        help='OpenCode config copied into the fresh arkade VM')
+                        help='OpenCode config used for the native arkade agent')
+    parser.add_argument('--agent-auth-file', type=Path,
+                        help='OpenCode auth JSON for the Docker agent (default: local OpenCode auth)')
     parser.add_argument('--keep-agent-vm', action='store_true',
                         help='Retain the tagged arkade VM after the run for inspection')
     parser.add_argument('--api-key-env', help='Environment variable containing a bearer key for the selected endpoint')
@@ -673,6 +684,8 @@ def main():
         parser.error('arkade-add requires --agent-model PROVIDER/MODEL for OpenCode, or --toilgate')
     if native_selected and args.agent_model and len(args.model) > 1:
         parser.error('--agent-model can only be used with one --model')
+    if args.keep_agent_vm and args.agent_runner != 'slicer':
+        parser.error('--keep-agent-vm requires --agent-runner slicer')
     if args.toilgate:
         if args.endpoint or args.api_key_env:
             parser.error('--toilgate cannot be combined with --endpoint or --api-key-env')
@@ -687,10 +700,20 @@ def main():
             if task_id == 'arkade-add':
                 agent_model = args.agent_model or (model if model.startswith('toilgate/')
                                                    else 'toilgate/' + model)
-                result = native_arkade.run(
-                    model, agent_model, args.arkade_root, args.image, args.output,
-                    seconds=args.seconds, keep_vm=args.keep_agent_vm,
-                    config_file=args.agent_config_file, variant=args.reasoning_effort)
+                if args.agent_runner == 'docker':
+                    result = native_arkade.run_docker(
+                        model, agent_model, args.arkade_root, args.image,
+                        args.agent_image, args.output, seconds=args.seconds,
+                        config_file=args.agent_config_file,
+                        auth_file=args.agent_auth_file, api_key_env=args.api_key_env,
+                        variant=args.reasoning_effort)
+                else:
+                    result = native_arkade.run_slicer(
+                        model, agent_model, args.arkade_root, args.image,
+                        args.output, seconds=args.seconds,
+                        keep_vm=args.keep_agent_vm,
+                        config_file=args.agent_config_file,
+                        variant=args.reasoning_effort)
                 result['suite_sha256'] = suite_hash()
                 spec = {'task': tasks.TASKS[task_id], 'prompt': native_arkade.PROMPT}
                 result['task_sha256'] = hashlib.sha256(
@@ -699,7 +722,7 @@ def main():
                 result['request'] = {'agent_model': agent_model,
                                      'agent_variant': args.reasoning_effort,
                                      'task_seconds': args.seconds,
-                                     'harness': 'slicer-opencode-native'}
+                                     'harness': result['harness']}
             else:
                 with tempfile.TemporaryDirectory(prefix='rigmark-quality-') as directory:
                     result = run_task(task_id, model, Path(directory), args.arkade_root,
