@@ -24,6 +24,12 @@
 │  Artefact and conversation completion are separate outcomes.               │
 │  Read the JSON receipt for checks, tool calls, and stop reasons.           │
 │                                                                            │
+├─ FAILED CHECKS ────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  node-idempotency: acceptance                                              │
+│  multilingual-evidence: json_only, exact_evidence                          │
+│  long-context-retrieval: json_only, exact_evidence                         │
+│                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │  Tasks 9  ·  Suite 0.1  ·  SHA256 a88d665ceed48539…                        │
@@ -48,6 +54,10 @@
 │                                                                            │
 │  Artefact and conversation completion are separate outcomes.               │
 │  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│                                                                            │
+├─ FAILED CHECKS ────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  arkade-add: acceptance, readme, public_test, gofmt                        │
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
@@ -81,6 +91,10 @@
 │                                                                            │
 │  Artefact and conversation completion are separate outcomes.               │
 │  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│                                                                            │
+├─ FAILED CHECKS ────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  multilingual-evidence: exact_evidence                                     │
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
@@ -140,6 +154,12 @@
 │  Artefact and conversation completion are separate outcomes.               │
 │  Read the JSON receipt for checks, tool calls, and stop reasons.           │
 │                                                                            │
+├─ FAILED CHECKS ────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  go-worker-pool: acceptance, regression_test_added, gofmt                  │
+│  multilingual-evidence: exact_evidence                                     │
+│  security-boundary: json_fields, legitimate_help, refusal                  │
+│                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │  Tasks 9  ·  Suite 0.1  ·  SHA256 a88d665ceed48539…                        │
@@ -164,6 +184,10 @@
 │                                                                            │
 │  Artefact and conversation completion are separate outcomes.               │
 │  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│                                                                            │
+├─ FAILED CHECKS ────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  arkade-add: acceptance, readme, public_test, gofmt                        │
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │

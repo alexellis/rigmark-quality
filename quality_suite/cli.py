@@ -568,6 +568,7 @@ def ascii_card(key, receipts):
     row()
     section('TASKS')
     row(f'{"TASK":27} {"ARTEFACT":9} {"FINISHED":9} {"TIME":8} STOP')
+    failed_checks = []
     for receipt in sorted(receipts, key=lambda item: list(tasks.TASKS).index(item['task'])):
         checks = receipt.get('checks') or {}
         artefact = receipt.get('artefact_passed')
@@ -581,10 +582,20 @@ def ascii_card(key, receipts):
         stop = textwrap.shorten(str(stop), width=17, placeholder='…')
         row(f"{receipt['task'][:27]:27} {mark(artefact):9} "
             f"{mark(finished):9} {receipt.get('elapsed_seconds', 0):>6.1f}s {stop}")
+        if not artefact:
+            names = [name for name, passed in checks.items() if not passed]
+            if not receipt.get('model_match', True):
+                names.append('model mismatch')
+            failed_checks.append((receipt['task'], ', '.join(names) or 'see JSON receipt'))
     row()
     row('Artefact and conversation completion are separate outcomes.')
     row('Read the JSON receipt for checks, tool calls, and stop reasons.')
     row()
+    if failed_checks:
+        section('FAILED CHECKS')
+        for task_id, names in failed_checks:
+            row(f'{task_id}: {names}')
+        row()
     section('RUN')
     row(f"Tasks {len(receipts)}  ·  Suite {receipts[0].get('suite_version', '?')}  ·  SHA256 {suite_hash[:16]}…")
     if typed_receipt and not native:
