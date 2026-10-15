@@ -145,6 +145,22 @@ set when `arkade-add` is selected. `--reasoning-effort` maps to OpenCode's
 its own per-response token limit, which the receipt does not equate with
 the typed-tool token cap.
 
+**Without Slicer**, run the twelve typed-tool tasks by selecting every task
+except `arkade-add`. They need only Docker and the model endpoint; neither
+`--arkade-root` nor `--agent-model` is required:
+
+```sh
+./rigmark quality run --model MODEL_ID \
+  --endpoint http://MODEL_HOST:8000/v1 --auth-file none \
+  --reasoning-effort low --output quality-results/typed-tools \
+  $(./rigmark quality list | awk '$1 != "arkade-add" { print "--task", $1 }')
+./rigmark quality report --output quality-results/typed-tools
+```
+
+The card then reports twelve tasks. This is not a full-suite result, so say
+that `arkade-add` was not run when sharing it. `selftest` still needs the
+pinned arkade checkout, because it checks the native task's grader.
+
 | Provider | Connection |
 | --- | --- |
 | Local vLLM, SGLang, llama.cpp, or similar | `--endpoint http://HOST:PORT/v1 --auth-file none` |
