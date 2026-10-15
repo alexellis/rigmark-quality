@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from . import cli
 from .tools import ToolBox
 
 
@@ -23,6 +24,22 @@ class FileSearchTests(unittest.TestCase):
                              {'matches': ['candidate.go:1: Name:       "yq"']})
             self.assertEqual(box.call('list_files', '{}'),
                              {'files': ['candidate.go']})
+
+
+class CandidateLinkTests(unittest.TestCase):
+    def test_grading_does_not_follow_planted_links(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host_file = root / 'host-secret.txt'
+            host_file.write_text('not for the judge\n')
+            workspace = root / 'workspace'
+            workspace.mkdir()
+            (workspace / 'expiry.py').symlink_to(host_file)
+            copy = root / 'copy'
+            cli.copy_workspace(workspace, copy)
+            self.assertTrue((copy / 'expiry.py').is_symlink())
+            self.assertEqual(cli.read_candidate_text(workspace / 'expiry.py'), '')
+            self.assertEqual(cli.read_candidate_text(workspace / 'missing.py'), '')
 
 
 if __name__ == '__main__':

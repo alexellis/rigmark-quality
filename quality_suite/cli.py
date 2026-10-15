@@ -95,18 +95,36 @@ def make_workspace(task_id, root, arkade_root):
     return destination
 
 
+def copy_workspace(source, destination, **options):
+    """Copy a candidate workspace, keeping any links it planted as links.
+
+    Candidate code runs with the workspace mounted read-write, so it can leave
+    a link to a host file. Following it here would copy that file into the
+    judge's container and, through its output, into the receipt.
+    """
+    shutil.copytree(source, destination, symlinks=True, **options)
+
+
+def read_candidate_text(path):
+    """Read a candidate file on the host; links and special files read as empty."""
+    path = Path(path)
+    if path.is_symlink() or not path.is_file():
+        return ''
+    return path.read_text()
+
+
 def grade_coding(task_id, workspace, image, arkade_root):
     if task_id == 'statement-redact':
         return grade_statement(workspace, image)
     with tempfile.TemporaryDirectory(prefix='rigmark-public-') as directory:
         public_candidate = Path(directory) / 'candidate'
-        shutil.copytree(workspace, public_candidate,
-                        ignore=shutil.ignore_patterns('.git'))
+        copy_workspace(workspace, public_candidate,
+                       ignore=shutil.ignore_patterns('.git'))
         public = runtime.run(public_candidate, image,
                              runtime.public_command(task_id), 120)
     with tempfile.TemporaryDirectory(prefix='rigmark-accept-') as directory:
         candidate = Path(directory) / 'candidate'
-        shutil.copytree(workspace, candidate, ignore=shutil.ignore_patterns('.git'))
+        copy_workspace(workspace, candidate, ignore=shutil.ignore_patterns('.git'))
         for name, content in evaluators.files(task_id, arkade_root).items():
             target = candidate / name
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -120,7 +138,7 @@ def grade_coding(task_id, workspace, image, arkade_root):
                  'node-idempotency': 'store.test.js',
                  'go-worker-pool': 'pool_test.go',
                  'go-transfer-ledger': 'transfer_test.go'}[task_id]
-    checks['regression_test_added'] = len((workspace / test_name).read_text()) > len(tasks.TASKS[task_id]['files'][test_name]) + 20
+    checks['regression_test_added'] = len(read_candidate_text(workspace / test_name)) > len(tasks.TASKS[task_id]['files'][test_name]) + 20
     if task_id in ('go-worker-pool', 'go-transfer-ledger'):
         source_name = 'pool.go' if task_id == 'go-worker-pool' else 'transfer.go'
         formatted = subprocess.run(['docker', 'run', '--rm', '--network=none',
@@ -145,7 +163,7 @@ def grade_statement(workspace, image):
     for name, source, rows in cases:
         with tempfile.TemporaryDirectory(prefix='rigmark-bank-accept-') as directory:
             candidate = Path(directory) / 'candidate'
-            shutil.copytree(workspace, candidate)
+            copy_workspace(workspace, candidate)
             shutil.copyfile(source, candidate / 'bank_statement.pdf')
             run = runtime.run(candidate, image,
                               'python3 -B redact_statement.py bank_statement.pdf redacted.pdf',
@@ -267,11 +285,13 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
     changes = {}
     for path, before in originals.items():
         target = workspace / path
-        after = target.read_text() if target.exists() else ''
+        after = read_candidate_text(target)
         changes[path] = {'sha256': hashlib.sha256(after.encode()).hexdigest(),
                          'diff': ''.join(difflib.unified_diff(
                              before.splitlines(keepends=True), after.splitlines(keepends=True),
                              fromfile='original/' + path, tofile='candidate/' + path))}
+        if target.is_symlink():
+            changes[path]['symlink'] = True
     spec = tasks.TASKS[task_id]
     task_hash = hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()
     usage = {'prompt_tokens': 0, 'completion_tokens': 0, 'reasoning_tokens': 0}
