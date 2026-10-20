@@ -194,9 +194,10 @@ one run has no confidence interval. Compare rates only with the same suite
 hash, harness, model/backend, reasoning setting, and limits.
 
 Use `--format json` for a machine-readable diagnostic matrix and per-run
-`resolution` objects. Each task JSON
-receipt records the requested and observed model, request limits, suite and
-task hashes, runtime image, checks, elapsed time, tool trace, and stop reason.
+`resolution` objects. Each task JSON receipt records the requested and
+observed model, request limits, suite and task hashes, runtime image, checks,
+elapsed time, tool trace, stop reason, and failure category. New receipts mark
+provider, model-identity, and harness faults as infrastructure failures.
 The card deliberately separates **artefact passed** from **conversation
 finished**: correct code followed by a reasoning loop is a distinct outcome.
 Coding artefacts must pass both the final public tests and withheld checks;

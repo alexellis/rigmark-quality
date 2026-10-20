@@ -261,6 +261,7 @@ def run_slicer(model, agent_model, original, image, output, seconds=1800,
     details = {}
     process_checks = {}
     failure = None
+    failure_category = None
     setup_seconds = agent_seconds = judge_seconds = None
     observed = []
     instruction_evidence = {}
@@ -325,8 +326,10 @@ def run_slicer(model, agent_model, original, image, output, seconds=1800,
         observed = _model_events(session_export if session_export.exists() else log)
         if result.get('timeout'):
             failure = 'time_budget'
+            failure_category = 'budget'
         elif agent_exit != 0:
             failure = f'agent_exit_{agent_exit}'
+            failure_category = 'infrastructure'
 
         head = command(['slicer', 'vm', 'exec', vm, '--shell', '', '--',
                         'git', '-C', '/home/ubuntu/arkade', 'rev-parse', 'HEAD'],
@@ -353,8 +356,10 @@ def run_slicer(model, agent_model, original, image, output, seconds=1800,
         judge_seconds = round(time.monotonic() - judged_at, 1)
     except TransportError as exc:
         failure = f'transport_error: {exc}'
+        failure_category = 'infrastructure'
     except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
         failure = failure or f'harness_error: {exc}'
+        failure_category = 'infrastructure'
     finally:
         if pinned_config:
             pinned_config.unlink(missing_ok=True)
@@ -366,6 +371,7 @@ def run_slicer(model, agent_model, original, image, output, seconds=1800,
     model_match = bool(observed) and observed == [agent_model]
     if failure is None and not model_match:
         failure = 'model_mismatch' if observed else 'model_unverified'
+        failure_category = 'infrastructure'
     artefact_passed = bool(checks) and all(checks.values()) and model_match
     finished = agent_exit == 0
     return {
@@ -388,7 +394,7 @@ def run_slicer(model, agent_model, original, image, output, seconds=1800,
         'artefact_passed': artefact_passed,
         'conversation_finished': finished,
         'passed': artefact_passed and finished and failure is None,
-        'failure': failure,
+        'failure': failure, 'failure_category': failure_category,
     }
 
 
@@ -411,6 +417,7 @@ def run_docker(model, agent_model, original, image, agent_image, output,
     details = {}
     process_checks = {}
     failure = None
+    failure_category = None
     setup_seconds = agent_seconds = judge_seconds = None
     observed = []
     instruction_evidence = {}
@@ -478,6 +485,7 @@ def run_docker(model, agent_model, original, image, agent_image, output,
                 agent_exit = int(waited)
             except subprocess.TimeoutExpired:
                 failure = 'time_budget'
+                failure_category = 'budget'
                 subprocess.run(['docker', 'kill', container_id],
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                timeout=30)
@@ -527,6 +535,7 @@ def run_docker(model, agent_model, original, image, agent_image, output,
                                      else log)
             if failure is None and agent_exit != 0:
                 failure = f'agent_exit_{agent_exit}'
+                failure_category = 'infrastructure'
             diff = subprocess.run(['git', '-C', str(candidate), 'diff', '--check'],
                                   text=True, capture_output=True, timeout=30)
             process_checks['diff_clean'] = diff.returncode == 0
@@ -539,8 +548,10 @@ def run_docker(model, agent_model, original, image, agent_image, output,
             judge_seconds = round(time.monotonic() - judged_at, 1)
         except TransportError as exc:
             failure = f'transport_error: {exc}'
+            failure_category = 'infrastructure'
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
             failure = failure or f'harness_error: {exc}'
+            failure_category = 'infrastructure'
         finally:
             if container_id:
                 subprocess.run(['docker', 'rm', '-f', container_id],
@@ -550,6 +561,7 @@ def run_docker(model, agent_model, original, image, agent_image, output,
     model_match = bool(observed) and observed == [agent_model]
     if failure is None and not model_match:
         failure = 'model_mismatch' if observed else 'model_unverified'
+        failure_category = 'infrastructure'
     artefact_passed = bool(checks) and all(checks.values()) and model_match
     finished = agent_exit == 0
     return {
@@ -573,5 +585,5 @@ def run_docker(model, agent_model, original, image, agent_image, output,
         'artefact_passed': artefact_passed,
         'conversation_finished': finished,
         'passed': artefact_passed and finished and failure is None,
-        'failure': failure,
+        'failure': failure, 'failure_category': failure_category,
     }

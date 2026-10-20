@@ -14,7 +14,9 @@ conversation is unsolved for this rate; both outcomes remain visible. Missing
 or duplicate receipts, model mismatches, and transport, harness, or judge
 failures withhold the rate. Time and output budget stops count as unsolved.
 The count is printed beside the percentage, and the JSON report records the
-same per-run result. Do not compare rates across suite hashes or harnesses.
+same per-run result. New receipts record a structured failure category;
+historical receipts use their recorded failure reason for classification.
+Do not compare rates across suite hashes or harnesses.
 
 The default limit is 1,800 seconds per task. Typed-tool tasks request 32,768
 output tokens per response and have no default model-turn cap; an explicit

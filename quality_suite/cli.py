@@ -198,6 +198,7 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
     started = time.monotonic()
     event_log = []
     failure = None
+    failure_category = None
     answer = ''
     observed_models = []
     conversation_finished = False
@@ -205,9 +206,11 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
         remaining = seconds - (time.monotonic() - started)
         if remaining <= 0:
             failure = 'task deadline exceeded'
+            failure_category = 'budget'
             break
         if max_steps and step >= max_steps:
             failure = 'model turn limit exceeded'
+            failure_category = 'budget'
             break
         try:
             data = completion(endpoint, model, messages, box.definitions, auth_file,
@@ -224,8 +227,10 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
                 answer = msg.get('content') or ''
                 if finish_reason == 'length':
                     failure = 'model exhausted output token cap'
+                    failure_category = 'budget'
                 elif not answer.strip():
                     failure = 'model returned no final answer or tool call'
+                    failure_category = 'task'
                 else:
                     conversation_finished = True
                 break
@@ -241,6 +246,7 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
                     notice = reminder
                 if stop:
                     failure = stop
+                    failure_category = 'task'
             if failure:
                 break
             reminder, stop = guard.exploration(step + 1,
@@ -249,11 +255,13 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
                 notice = reminder
             if stop:
                 failure = stop
+                failure_category = 'task'
                 break
             if notice:
                 messages.append({'role': 'user', 'content': notice})
         except (error.URLError, TimeoutError, KeyError, IndexError, ValueError) as exc:
             failure = f'{type(exc).__name__}: {exc}'
+            failure_category = 'infrastructure'
             break
     if task_id in ('python-expiry', 'node-idempotency', 'go-worker-pool',
                    'go-transfer-ledger', 'statement-redact'):
@@ -331,7 +339,8 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
               'conversation_finished': conversation_finished,
               'governor_notices': guard.notices,
               'passed': all(checks.values()) and clean_models and failure is None,
-              'failure': failure, 'answer': answer,
+              'failure': failure, 'failure_category': failure_category,
+              'answer': answer,
               'calls': box.calls, 'events': event_log, 'acceptance': acceptance,
               'changes': changes}
     return result
@@ -522,7 +531,9 @@ def report(output, format='ascii'):
             if len(matches) == 1:
                 r = matches[0]
                 row[model] = {'passed': r['passed'], 'checks': r['checks'],
-                              'failure': r['failure'], 'elapsed_seconds': r['elapsed_seconds'],
+                              'failure': r['failure'],
+                              'failure_category': r.get('failure_category'),
+                              'elapsed_seconds': r['elapsed_seconds'],
                               'model_match': r['model_match'],
                               'artefact_passed': r.get('artefact_passed'),
                               'conversation_finished': r.get('conversation_finished')}
@@ -576,10 +587,14 @@ def resolution(receipts):
 
     for receipt in receipts:
         failure = str(receipt.get('failure') or '')
+        category = receipt.get('failure_category')
         if (receipt.get('model_match') is not True or
+                category not in (None, 'task', 'budget') or
                 failure.startswith(('transport_error:', 'harness_error:',
                                     'model_mismatch', 'model_unverified',
-                                    'HTTPError:', 'URLError:', 'TimeoutError:')) or
+                                    'HTTPError:', 'URLError:', 'TimeoutError:',
+                                    'KeyError:', 'IndexError:', 'ValueError:',
+                                    'JSONDecodeError:')) or
                 not isinstance(receipt.get('checks'), dict) or
                 not receipt['checks']):
             return {**base, 'status': 'invalid',
