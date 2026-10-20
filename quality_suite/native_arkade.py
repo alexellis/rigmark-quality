@@ -158,6 +158,12 @@ def _agent_error(path):
     return None
 
 
+def _require_agent_log_success(path):
+    problem = _agent_error(path)
+    if problem:
+        raise TransportError(problem)
+
+
 def _instruction_evidence(path):
     """Record observable AGENTS.md steps without requiring one tool spelling."""
     release_lookup = False
@@ -311,10 +317,9 @@ def run_slicer(model, agent_model, original, image, output, seconds=1800,
                                         stdout=stream, stderr=subprocess.STDOUT,
                                         timeout=60)
         if log_result.returncode:
-            provider_error = _agent_error(log)
-            if provider_error:
-                raise TransportError(provider_error)
+            _require_agent_log_success(log)
             raise RuntimeError(f'could not collect agent log: {log.read_text()[-2000:]}')
+        _require_agent_log_success(log)
         instruction_evidence = _instruction_evidence(log)
         process_checks['no_publish_attempt'] = not instruction_evidence['publish_attempt_seen']
         session_id = _session_id(log)
@@ -499,9 +504,7 @@ def run_docker(model, agent_model, original, image, agent_image, output,
                                         timeout=60)
             if result.returncode:
                 raise RuntimeError('could not collect agent log')
-            provider_error = _agent_error(log)
-            if provider_error and agent_exit != 0:
-                raise TransportError(provider_error)
+            _require_agent_log_success(log)
             instruction_evidence = _instruction_evidence(log)
             process_checks['no_publish_attempt'] = not instruction_evidence[
                 'publish_attempt_seen']

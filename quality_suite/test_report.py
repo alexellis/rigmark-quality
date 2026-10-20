@@ -112,6 +112,40 @@ class ResolutionTests(unittest.TestCase):
             runtime.require_judge_started({'exit_code': 127,
                                            'output': 'docker: executable missing'})
 
+    def test_statement_judge_requires_a_verdict_object(self):
+        self.assertEqual(cli.statement_verdict('{"valid_pdf": false}'),
+                         {'valid_pdf': False})
+        for output in ('{}', '[]', 'null', '{"valid_pdf": true}'):
+            with self.subTest(output=output), self.assertRaises(ValueError):
+                cli.statement_verdict(output)
+
+    def test_empty_statement_verdict_invalidates_complete_run(self):
+        model = 'deepseek-v4-flash-0731'
+        response = {'model': model, 'choices': [{
+            'message': {'role': 'assistant', 'content': 'Statement redacted.'},
+            'finish_reason': 'stop'}]}
+
+        def fake_judge(workspace, _image, command, _timeout):
+            if 'redact_statement.py' in command:
+                (workspace / 'redacted.pdf').write_bytes(b'%PDF-1.0')
+                return {'exit_code': 0, 'timeout': False, 'output': ''}
+            return {'exit_code': 0, 'timeout': False, 'output': '{}'}
+
+        with TemporaryDirectory() as directory:
+            with (patch.object(cli, 'completion', return_value=response),
+                  patch.object(cli.runtime, 'run', side_effect=fake_judge),
+                  patch.object(cli.runtime, 'image_id', return_value='test-image')):
+                attempt = cli.run_task('statement-redact', model,
+                                       Path(directory), Path(directory), 'unused',
+                                       'http://unused/v1', 'none', 0, 60, 'low',
+                                       'default')
+        self.assertEqual(attempt['failure_category'], 'infrastructure')
+        run = copy.deepcopy(self.run)
+        run[next(i for i, r in enumerate(run) if r['task'] == 'statement-redact')] = attempt
+        result = cli.resolution(run)
+        self.assertEqual(result['status'], 'invalid')
+        self.assertIsNone(result['rate_percent'])
+
     def test_correct_artefact_without_completion_is_unsolved(self):
         run = copy.deepcopy(self.run)
         resolved = next(r for r in run if r['passed'])

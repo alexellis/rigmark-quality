@@ -173,14 +173,35 @@ print(json.dumps(judge("redacted.pdf", rows)))
             runtime.require_judge_started(judged)
             timed_out |= judged['timeout']
             try:
-                verdict = json.loads(judged['output'].strip()) if judged['exit_code'] == 0 else {}
+                verdict = (statement_verdict(judged['output'])
+                           if judged['exit_code'] == 0 else {})
             except ValueError as exc:
-                raise RuntimeError('statement judge returned invalid JSON') from exc
+                raise RuntimeError('statement judge returned invalid output') from exc
             checks[name] = bool(verdict) and all(verdict.values())
             details[name] = {'execution': run, 'judge': verdict,
                              'judge_error': judged['output'] if not verdict else ''}
     return checks, {'exit_code': 0 if all(checks.values()) else 1,
                     'timeout': timed_out, 'output': json.dumps(details)}
+
+
+_STATEMENT_CHECKS = frozenset((
+    'valid_pdf', 'transaction_count', 'transaction_order',
+    'dates_amounts_balances', 'other_text_preserved',
+    'no_extractable_sender_names', 'no_visible_sender_names'))
+
+
+def statement_verdict(output):
+    """Reject malformed judge output rather than scoring it as model failure."""
+    verdict = json.loads(output.strip())
+    if not isinstance(verdict, dict) or type(verdict.get('valid_pdf')) is not bool:
+        raise ValueError('expected a statement verdict object')
+    if verdict['valid_pdf'] is False:
+        if set(verdict) != {'valid_pdf'}:
+            raise ValueError('invalid PDF verdict has unexpected fields')
+    elif set(verdict) != _STATEMENT_CHECKS or any(
+            type(value) is not bool for value in verdict.values()):
+        raise ValueError('statement verdict fields are incomplete')
+    return verdict
 
 
 def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
