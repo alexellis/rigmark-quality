@@ -27,6 +27,25 @@ def utc_now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def inspect_runtime_image(image):
+    try:
+        return runtime.image_id(image), None
+    except (OSError, subprocess.SubprocessError) as exc:
+        return None, f'runtime_image_error: {type(exc).__name__}: {exc}'
+
+
+def response_choice(data):
+    if not isinstance(data, dict):
+        raise ValueError('completion response is not an object')
+    choices = data.get('choices')
+    if not isinstance(choices, list) or not choices:
+        raise ValueError('completion choices must be a non-empty list')
+    choice = choices[0]
+    if not isinstance(choice, dict) or not isinstance(choice.get('message'), dict):
+        raise ValueError('completion choice has no message object')
+    return choice
+
+
 def suite_hash():
     digest = hashlib.sha256()
     root = Path(__file__).parent
@@ -243,9 +262,10 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
             data = completion(endpoint, model, messages, box.definitions, auth_file,
                               max(1, remaining), reasoning_effort,
                               thinking, max_output_tokens, api_key_env)
+            choice = response_choice(data)
             observed_models.append(data.get('model'))
-            msg = data['choices'][0]['message']
-            finish_reason = data['choices'][0].get('finish_reason')
+            msg = choice['message']
+            finish_reason = choice.get('finish_reason')
             event_log.append({'step': step + 1, 'finish_reason': finish_reason,
                               'message': msg, 'usage': data.get('usage')})
             calls = msg.get('tool_calls') or []
@@ -286,7 +306,8 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
                 break
             if notice:
                 messages.append({'role': 'user', 'content': notice})
-        except (error.URLError, TimeoutError, KeyError, IndexError, ValueError) as exc:
+        except (error.URLError, TimeoutError, KeyError, IndexError, ValueError,
+                TypeError, AttributeError) as exc:
             failure = f'{type(exc).__name__}: {exc}'
             failure_category = 'infrastructure'
             break
@@ -345,6 +366,10 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
         usage['completion_tokens'] += item.get('completion_tokens') or 0
         details = item.get('completion_tokens_details') or {}
         usage['reasoning_tokens'] += details.get('reasoning_tokens') or 0
+    runtime_image_id, runtime_image_error = inspect_runtime_image(image)
+    if runtime_image_error:
+        failure = failure or runtime_image_error
+        failure_category = 'infrastructure'
     result = {'task': task_id, 'category': tasks.TASKS[task_id]['category'],
               'interpretation': 'diagnostic_only',
               'task_status': ('exploratory' if task_id == 'statement-redact'
@@ -357,7 +382,7 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
                           'reasoning_effort': reasoning_effort,
                           'thinking': thinking},
               'arkade_revision': tasks.ARKADE_REVISION if task_id == 'arkade-add' else None,
-              'runtime_image_id': runtime.image_id(image),
+              'runtime_image_id': runtime_image_id,
               'requested_model': model, 'observed_models': observed_models,
               'model_match': clean_models, 'started_at': started_at,
               'finished_at': utc_now(),
@@ -844,7 +869,12 @@ def main():
                 spec = {'task': tasks.TASKS[task_id], 'prompt': native_arkade.PROMPT}
                 result['task_sha256'] = hashlib.sha256(
                     json.dumps(spec, sort_keys=True).encode()).hexdigest()
-                result['runtime_image_id'] = runtime.image_id(args.image)
+                result['runtime_image_id'], runtime_image_error = inspect_runtime_image(
+                    args.image)
+                if runtime_image_error:
+                    result['failure'] = result.get('failure') or runtime_image_error
+                    result['failure_category'] = 'infrastructure'
+                    result['passed'] = False
                 result['request'] = {'agent_model': agent_model,
                                      'agent_variant': args.reasoning_effort,
                                      'task_seconds': args.seconds,

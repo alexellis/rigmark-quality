@@ -4,6 +4,7 @@ from contextlib import redirect_stdout
 import io
 import json
 from pathlib import Path
+import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
@@ -77,6 +78,39 @@ class ResolutionTests(unittest.TestCase):
                                        'none', 0, 60, 'low', 'default')
         self.assertTrue(attempt['model_match'])
         self.assertEqual(attempt['failure_category'], 'infrastructure')
+        run = copy.deepcopy(self.run)
+        run[next(i for i, r in enumerate(run) if r['task'] == 'stock-transfer')] = attempt
+        self.assertEqual(cli.resolution(run)['status'], 'invalid')
+
+    def test_non_object_and_null_choices_produce_receipts(self):
+        model = 'deepseek-v4-flash-0731'
+        for malformed in ([], {'model': model, 'choices': None},
+                          {'model': model, 'choices': [None]}):
+            with self.subTest(malformed=malformed), TemporaryDirectory() as directory:
+                with (patch.object(cli, 'completion', return_value=malformed),
+                      patch.object(cli.runtime, 'image_id', return_value='test-image')):
+                    attempt = cli.run_task('stock-transfer', model, Path(directory),
+                                           Path(directory), 'unused', 'http://unused/v1',
+                                           'none', 0, 60, 'low', 'default')
+                self.assertEqual(attempt['failure_category'], 'infrastructure')
+                self.assertFalse(attempt['passed'])
+                self.assertIsNotNone(attempt['failure'])
+
+    def test_image_inspection_failure_produces_invalid_receipt(self):
+        model = 'deepseek-v4-flash-0731'
+        response = {'model': model, 'choices': [{
+            'message': {'role': 'assistant', 'content': 'Done.'},
+            'finish_reason': 'stop'}]}
+        missing_image = subprocess.CalledProcessError(1, ['docker', 'image', 'inspect'])
+        with TemporaryDirectory() as directory:
+            with (patch.object(cli, 'completion', return_value=response),
+                  patch.object(cli.runtime, 'image_id', side_effect=missing_image)):
+                attempt = cli.run_task('stock-transfer', model, Path(directory),
+                                       Path(directory), 'unused', 'http://unused/v1',
+                                       'none', 0, 60, 'low', 'default')
+        self.assertIsNone(attempt['runtime_image_id'])
+        self.assertEqual(attempt['failure_category'], 'infrastructure')
+        self.assertFalse(attempt['passed'])
         run = copy.deepcopy(self.run)
         run[next(i for i, r in enumerate(run) if r['task'] == 'stock-transfer')] = attempt
         self.assertEqual(cli.resolution(run)['status'], 'invalid')
