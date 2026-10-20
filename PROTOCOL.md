@@ -6,6 +6,19 @@ requested and observed model, the complete request settings, task/suite
 hashes, runtime image, elapsed time, tool calls, file diffs, independent
 checks, and the reason the governor stopped the attempt.
 
+A complete run reports **task resolution rate** as independently verified,
+finished tasks divided by all tasks in that protocol, expressed as a
+percentage. This is a property of the recorded suite and agent setup, not an
+intrinsic model score. A task with correct artefacts but an unfinished
+conversation is unsolved for this rate; both outcomes remain visible. Missing
+or duplicate receipts, model mismatches, and transport, harness, judge-startup,
+or malformed judge-output failures withhold the rate. Time and output budget
+stops count as unsolved.
+The count is printed beside the percentage, and the JSON report records the
+same per-run result. New receipts record a structured failure category;
+historical receipts use their recorded failure reason for classification.
+Do not compare rates across suite hashes or harnesses.
+
 The default limit is 1,800 seconds per task. Typed-tool tasks request 32,768
 output tokens per response and have no default model-turn cap; an explicit
 `--max-steps N` can add one. OpenCode controls response tokens and turns for

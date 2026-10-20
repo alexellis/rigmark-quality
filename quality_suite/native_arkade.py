@@ -67,9 +67,11 @@ def grade(candidate, original, image):
     test_files = [path for path in changed if path.endswith('_test.go')]
     public = runtime.run(candidate, image,
                          'go test -mod=vendor -count=1 -timeout=90s ./pkg/get', 180)
+    runtime.require_judge_started(public)
     formatted = runtime.run(candidate, image,
                             'gofmt -l ' + ' '.join(map(shlex.quote, changed))
                             if changed else 'true', 30)
+    runtime.require_judge_started(formatted)
     with tempfile.TemporaryDirectory(prefix='rigmark-arkade-judge-') as directory:
         judged = Path(directory) / 'candidate'
         shutil.copytree(candidate, judged)
@@ -79,6 +81,7 @@ def grade(candidate, original, image):
             target.write_text(content)
         acceptance = runtime.run(judged, image,
                                  runtime.acceptance_command('arkade-add'), 180)
+        runtime.require_judge_started(acceptance)
     readme = (Path(candidate) / 'README.md').read_text()
     checks = {
         'public_tests': public['exit_code'] == 0 and not public['timeout'],
@@ -153,6 +156,12 @@ def _agent_error(path):
             detail = event.get('error', {}).get('data', {}).get('message')
             return detail if isinstance(detail, str) else 'provider error'
     return None
+
+
+def _require_agent_log_success(path):
+    problem = _agent_error(path)
+    if problem:
+        raise TransportError(problem)
 
 
 def _instruction_evidence(path):
@@ -261,6 +270,7 @@ def run_slicer(model, agent_model, original, image, output, seconds=1800,
     details = {}
     process_checks = {}
     failure = None
+    failure_category = None
     setup_seconds = agent_seconds = judge_seconds = None
     observed = []
     instruction_evidence = {}
@@ -307,10 +317,9 @@ def run_slicer(model, agent_model, original, image, output, seconds=1800,
                                         stdout=stream, stderr=subprocess.STDOUT,
                                         timeout=60)
         if log_result.returncode:
-            provider_error = _agent_error(log)
-            if provider_error:
-                raise TransportError(provider_error)
+            _require_agent_log_success(log)
             raise RuntimeError(f'could not collect agent log: {log.read_text()[-2000:]}')
+        _require_agent_log_success(log)
         instruction_evidence = _instruction_evidence(log)
         process_checks['no_publish_attempt'] = not instruction_evidence['publish_attempt_seen']
         session_id = _session_id(log)
@@ -325,8 +334,10 @@ def run_slicer(model, agent_model, original, image, output, seconds=1800,
         observed = _model_events(session_export if session_export.exists() else log)
         if result.get('timeout'):
             failure = 'time_budget'
+            failure_category = 'budget'
         elif agent_exit != 0:
             failure = f'agent_exit_{agent_exit}'
+            failure_category = 'infrastructure'
 
         head = command(['slicer', 'vm', 'exec', vm, '--shell', '', '--',
                         'git', '-C', '/home/ubuntu/arkade', 'rev-parse', 'HEAD'],
@@ -353,8 +364,10 @@ def run_slicer(model, agent_model, original, image, output, seconds=1800,
         judge_seconds = round(time.monotonic() - judged_at, 1)
     except TransportError as exc:
         failure = f'transport_error: {exc}'
+        failure_category = 'infrastructure'
     except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
         failure = failure or f'harness_error: {exc}'
+        failure_category = 'infrastructure'
     finally:
         if pinned_config:
             pinned_config.unlink(missing_ok=True)
@@ -366,6 +379,7 @@ def run_slicer(model, agent_model, original, image, output, seconds=1800,
     model_match = bool(observed) and observed == [agent_model]
     if failure is None and not model_match:
         failure = 'model_mismatch' if observed else 'model_unverified'
+        failure_category = 'infrastructure'
     artefact_passed = bool(checks) and all(checks.values()) and model_match
     finished = agent_exit == 0
     return {
@@ -388,7 +402,7 @@ def run_slicer(model, agent_model, original, image, output, seconds=1800,
         'artefact_passed': artefact_passed,
         'conversation_finished': finished,
         'passed': artefact_passed and finished and failure is None,
-        'failure': failure,
+        'failure': failure, 'failure_category': failure_category,
     }
 
 
@@ -411,6 +425,7 @@ def run_docker(model, agent_model, original, image, agent_image, output,
     details = {}
     process_checks = {}
     failure = None
+    failure_category = None
     setup_seconds = agent_seconds = judge_seconds = None
     observed = []
     instruction_evidence = {}
@@ -478,6 +493,7 @@ def run_docker(model, agent_model, original, image, agent_image, output,
                 agent_exit = int(waited)
             except subprocess.TimeoutExpired:
                 failure = 'time_budget'
+                failure_category = 'budget'
                 subprocess.run(['docker', 'kill', container_id],
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                timeout=30)
@@ -488,9 +504,7 @@ def run_docker(model, agent_model, original, image, agent_image, output,
                                         timeout=60)
             if result.returncode:
                 raise RuntimeError('could not collect agent log')
-            provider_error = _agent_error(log)
-            if provider_error and agent_exit != 0:
-                raise TransportError(provider_error)
+            _require_agent_log_success(log)
             instruction_evidence = _instruction_evidence(log)
             process_checks['no_publish_attempt'] = not instruction_evidence[
                 'publish_attempt_seen']
@@ -527,6 +541,7 @@ def run_docker(model, agent_model, original, image, agent_image, output,
                                      else log)
             if failure is None and agent_exit != 0:
                 failure = f'agent_exit_{agent_exit}'
+                failure_category = 'infrastructure'
             diff = subprocess.run(['git', '-C', str(candidate), 'diff', '--check'],
                                   text=True, capture_output=True, timeout=30)
             process_checks['diff_clean'] = diff.returncode == 0
@@ -539,8 +554,10 @@ def run_docker(model, agent_model, original, image, agent_image, output,
             judge_seconds = round(time.monotonic() - judged_at, 1)
         except TransportError as exc:
             failure = f'transport_error: {exc}'
+            failure_category = 'infrastructure'
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
             failure = failure or f'harness_error: {exc}'
+            failure_category = 'infrastructure'
         finally:
             if container_id:
                 subprocess.run(['docker', 'rm', '-f', container_id],
@@ -550,6 +567,7 @@ def run_docker(model, agent_model, original, image, agent_image, output,
     model_match = bool(observed) and observed == [agent_model]
     if failure is None and not model_match:
         failure = 'model_mismatch' if observed else 'model_unverified'
+        failure_category = 'infrastructure'
     artefact_passed = bool(checks) and all(checks.values()) and model_match
     finished = agent_exit == 0
     return {
@@ -573,5 +591,5 @@ def run_docker(model, agent_model, original, image, agent_image, output,
         'artefact_passed': artefact_passed,
         'conversation_finished': finished,
         'passed': artefact_passed and finished and failure is None,
-        'failure': failure,
+        'failure': failure, 'failure_category': failure_category,
     }
