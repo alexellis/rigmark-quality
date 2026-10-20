@@ -47,6 +47,16 @@ def run(workspace, image, command, timeout=120):
                        stderr=subprocess.DEVNULL, timeout=15)
 
 
+def require_judge_started(result):
+    """Docker's reserved exit codes mean the judge did not execute."""
+    output = result.get('output', '')
+    if (result['exit_code'] == 125 or
+            (result['exit_code'] in (126, 127) and
+             ('docker:' in output.lower() or 'error response from daemon' in output.lower()))):
+        raise RuntimeError('judge container failed to start: '
+                           + output[-500:])
+
+
 def public_command(task_id):
     return {
         'python-expiry': 'python3 -B -m unittest -v test_expiry',

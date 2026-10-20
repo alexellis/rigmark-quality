@@ -104,6 +104,7 @@ def grade_coding(task_id, workspace, image, arkade_root):
                         ignore=shutil.ignore_patterns('.git'))
         public = runtime.run(public_candidate, image,
                              runtime.public_command(task_id), 120)
+        runtime.require_judge_started(public)
     with tempfile.TemporaryDirectory(prefix='rigmark-accept-') as directory:
         candidate = Path(directory) / 'candidate'
         shutil.copytree(workspace, candidate, ignore=shutil.ignore_patterns('.git'))
@@ -113,6 +114,7 @@ def grade_coding(task_id, workspace, image, arkade_root):
             target.write_text(content)
         result = runtime.run(candidate, image, runtime.acceptance_command(task_id),
                              90 if task_id == 'go-worker-pool' else 45)
+        runtime.require_judge_started(result)
     checks = {'acceptance': result['exit_code'] == 0 and not result['timeout'],
               'public_tests': public['exit_code'] == 0 and not public['timeout']}
     result['public_tests'] = public
@@ -128,6 +130,8 @@ def grade_coding(task_id, workspace, image, arkade_root):
             '--user=1000:1000', '-v', f'{workspace.resolve()}:/workspace:ro',
             '-w', '/workspace', image, 'gofmt', '-l', source_name, test_name],
             text=True, capture_output=True, timeout=30)
+        runtime.require_judge_started({'exit_code': formatted.returncode,
+                                       'output': formatted.stderr})
         checks['gofmt'] = formatted.returncode == 0 and not formatted.stdout.strip()
     return checks, result
 
@@ -150,6 +154,7 @@ def grade_statement(workspace, image):
             run = runtime.run(candidate, image,
                               'python3 -B redact_statement.py bank_statement.pdf redacted.pdf',
                               90)
+            runtime.require_judge_started(run)
             timed_out |= run['timeout']
             if run['exit_code'] != 0 or run['timeout'] or not (candidate / 'redacted.pdf').exists():
                 checks[name] = False
@@ -165,11 +170,12 @@ rows = tuple(Transaction(**row) for row in rows) if rows else ROWS
 print(json.dumps(judge("redacted.pdf", rows)))
 ''')
             judged = runtime.run(candidate, image, 'python3 -B judge_run.py', 90)
+            runtime.require_judge_started(judged)
             timed_out |= judged['timeout']
             try:
                 verdict = json.loads(judged['output'].strip()) if judged['exit_code'] == 0 else {}
-            except ValueError:
-                verdict = {}
+            except ValueError as exc:
+                raise RuntimeError('statement judge returned invalid JSON') from exc
             checks[name] = bool(verdict) and all(verdict.values())
             details[name] = {'execution': run, 'judge': verdict,
                              'judge_error': judged['output'] if not verdict else ''}
@@ -263,12 +269,18 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
             failure = f'{type(exc).__name__}: {exc}'
             failure_category = 'infrastructure'
             break
-    if task_id in ('python-expiry', 'node-idempotency', 'go-worker-pool',
-                   'go-transfer-ledger', 'statement-redact'):
-        checks, acceptance = grade_coding(task_id, workspace, image, arkade_root)
-    else:
-        checks = box.grade(answer)
-        acceptance = None
+    try:
+        if task_id in ('python-expiry', 'node-idempotency', 'go-worker-pool',
+                       'go-transfer-ledger', 'statement-redact'):
+            checks, acceptance = grade_coding(task_id, workspace, image, arkade_root)
+        else:
+            checks = box.grade(answer)
+            acceptance = None
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+        checks = {}
+        acceptance = {'judge_error': str(exc)}
+        failure = f'judge_error: {exc}'
+        failure_category = 'infrastructure'
     # Toilgate returns the backend checkpoint for this public GLM alias.
     aliases = {'glm-5.3-flash': 'nvidia/GLM-5.3-Flash-NVFP4'}
     clean_models = bool(observed_models) and set(observed_models) == {aliases.get(model, model)}
@@ -335,10 +347,11 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
                                         'loop_detected': len(words) >= 100 and repetition_fraction >= 0.5},
               'tool_diagnostics': tool_diagnostics,
               'steps': len(event_log), 'checks': checks,
-              'artefact_passed': all(checks.values()) and clean_models,
+              'artefact_passed': bool(checks) and all(checks.values()) and clean_models,
               'conversation_finished': conversation_finished,
               'governor_notices': guard.notices,
-              'passed': all(checks.values()) and clean_models and failure is None,
+              'passed': bool(checks) and all(checks.values())
+              and clean_models and failure is None,
               'failure': failure, 'failure_category': failure_category,
               'answer': answer,
               'calls': box.calls, 'events': event_log, 'acceptance': acceptance,

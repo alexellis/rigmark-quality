@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from . import cli
+from . import cli, runtime
 
 
 FIXTURES = (Path(__file__).resolve().parent.parent / 'examples' / 'receipts'
@@ -80,6 +80,37 @@ class ResolutionTests(unittest.TestCase):
         run = copy.deepcopy(self.run)
         run[next(i for i, r in enumerate(run) if r['task'] == 'stock-transfer')] = attempt
         self.assertEqual(cli.resolution(run)['status'], 'invalid')
+
+    def test_judge_start_failure_is_not_a_failed_task(self):
+        model = 'deepseek-v4-flash-0731'
+        response = {'model': model, 'choices': [{
+            'message': {'role': 'assistant', 'content': 'Fixed the expiry check.'},
+            'finish_reason': 'stop'}]}
+        docker_failure = {'exit_code': 125, 'timeout': False,
+                          'output': 'docker: cannot connect to daemon'}
+        with TemporaryDirectory() as directory:
+            with (patch.object(cli, 'completion', return_value=response),
+                  patch.object(cli.runtime, 'run', return_value=docker_failure),
+                  patch.object(cli.runtime, 'image_id', return_value='test-image')):
+                attempt = cli.run_task('python-expiry', model, Path(directory),
+                                       Path(directory), 'unused', 'http://unused/v1',
+                                       'none', 0, 60, 'low', 'default')
+        self.assertTrue(attempt['model_match'])
+        self.assertFalse(attempt['artefact_passed'])
+        self.assertEqual(attempt['failure_category'], 'infrastructure')
+        run = copy.deepcopy(self.run)
+        run[next(i for i, r in enumerate(run) if r['task'] == 'python-expiry')] = attempt
+        result = cli.resolution(run)
+        self.assertEqual(result['status'], 'invalid')
+        self.assertIsNone(result['rate_percent'])
+
+    def test_judge_assertion_failure_remains_a_task_result(self):
+        runtime.require_judge_started({'exit_code': 1, 'output': 'FAIL: assertion'})
+        runtime.require_judge_started({'exit_code': 127,
+                                       'output': '/bin/sh: candidate command not found'})
+        with self.assertRaises(RuntimeError):
+            runtime.require_judge_started({'exit_code': 127,
+                                           'output': 'docker: executable missing'})
 
     def test_correct_artefact_without_completion_is_unsolved(self):
         run = copy.deepcopy(self.run)

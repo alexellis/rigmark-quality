@@ -67,9 +67,11 @@ def grade(candidate, original, image):
     test_files = [path for path in changed if path.endswith('_test.go')]
     public = runtime.run(candidate, image,
                          'go test -mod=vendor -count=1 -timeout=90s ./pkg/get', 180)
+    runtime.require_judge_started(public)
     formatted = runtime.run(candidate, image,
                             'gofmt -l ' + ' '.join(map(shlex.quote, changed))
                             if changed else 'true', 30)
+    runtime.require_judge_started(formatted)
     with tempfile.TemporaryDirectory(prefix='rigmark-arkade-judge-') as directory:
         judged = Path(directory) / 'candidate'
         shutil.copytree(candidate, judged)
@@ -79,6 +81,7 @@ def grade(candidate, original, image):
             target.write_text(content)
         acceptance = runtime.run(judged, image,
                                  runtime.acceptance_command('arkade-add'), 180)
+        runtime.require_judge_started(acceptance)
     readme = (Path(candidate) / 'README.md').read_text()
     checks = {
         'public_tests': public['exit_code'] == 0 and not public['timeout'],
