@@ -11,8 +11,9 @@ finished tasks divided by all tasks in that protocol, expressed as a
 percentage. This is a property of the recorded suite and agent setup, not an
 intrinsic model score. A task with correct artefacts but an unfinished
 conversation is unsolved for this rate; both outcomes remain visible. Missing
-or duplicate receipts, model mismatches, and transport, harness, or judge
-failures withhold the rate. Time and output budget stops count as unsolved.
+or duplicate receipts, model mismatches, and transport, harness, judge-startup,
+or malformed judge-output failures withhold the rate. Time and output budget
+stops count as unsolved.
 The count is printed beside the percentage, and the JSON report records the
 same per-run result. New receipts record a structured failure category;
 historical receipts use their recorded failure reason for classification.

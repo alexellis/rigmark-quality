@@ -188,8 +188,9 @@ denominator only when every task has exactly one valid receipt. A task counts
 as resolved only when its independent checks pass and the conversation
 finishes. Incorrect work, a budget stop, or an unfinished conversation counts
 as unsolved. Missing or duplicate tasks, a model mismatch, or a transport,
-harness, or judge failure withholds the rate rather than silently changing the
-denominator. A 13-task suite changes by 7.7 percentage points for one task;
+harness, judge-startup, or malformed judge-output failure withholds the rate
+rather than silently changing the denominator. A 13-task suite changes by
+7.7 percentage points for one task;
 one run has no confidence interval. Compare rates only with the same suite
 hash, harness, model/backend, reasoning setting, and limits.
 
