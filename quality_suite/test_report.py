@@ -62,6 +62,22 @@ class ResolutionTests(unittest.TestCase):
                 self.assertEqual(result['status'], 'invalid')
                 self.assertIsNone(result['rate_percent'])
 
+    def test_legacy_agent_exit_is_not_scored_as_a_model_miss(self):
+        run = copy.deepcopy(self.run)
+        failed = next(r for r in run if not r['passed'])
+        failed['failure'] = 'agent_exit_1'
+        failed.pop('failure_category', None)
+        result = cli.resolution(run)
+        self.assertEqual(result['status'], 'invalid')
+        self.assertIsNone(result['rate_percent'])
+
+    def test_conflicting_pass_flag_invalidates_run(self):
+        run = copy.deepcopy(self.run)
+        next(r for r in run if r['passed'])['passed'] = False
+        result = cli.resolution(run)
+        self.assertEqual(result['status'], 'invalid')
+        self.assertIsNone(result['rate_percent'])
+
     def test_malformed_response_after_a_successful_turn_is_invalid(self):
         model = 'deepseek-v4-flash-0731'
         first = {'model': model, 'choices': [{

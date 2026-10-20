@@ -647,24 +647,27 @@ def resolution(receipts):
     for receipt in receipts:
         failure = str(receipt.get('failure') or '')
         category = receipt.get('failure_category')
+        legacy_failure = (failure and category is None and
+                          failure not in ('time_budget', 'tool step budget exhausted',
+                                          'task deadline exceeded',
+                                          'model turn limit exceeded',
+                                          'model exhausted output token cap',
+                                          'model returned no final answer or tool call') and
+                          not failure.startswith('no_progress:'))
         if (receipt.get('model_match') is not True or
                 category not in (None, 'task', 'budget') or
-                failure.startswith(('transport_error:', 'harness_error:',
-                                    'model_mismatch', 'model_unverified',
-                                    'HTTPError:', 'URLError:', 'TimeoutError:',
-                                    'KeyError:', 'IndexError:', 'ValueError:',
-                                    'JSONDecodeError:')) or
+                legacy_failure or
                 not isinstance(receipt.get('checks'), dict) or
                 not receipt['checks']):
             return {**base, 'status': 'invalid',
                     'reason': 'model, transport, harness, or judge failure'}
-        if receipt['passed'] and not (
-                all(receipt['checks'].values()) and
-                receipt.get('artefact_passed') is True and
-                receipt.get('conversation_finished') is True and
-                receipt.get('failure') is None):
+        evidence_passed = (all(receipt['checks'].values()) and
+                           receipt.get('artefact_passed') is True and
+                           receipt.get('conversation_finished') is True and
+                           receipt.get('failure') is None)
+        if receipt.get('passed') is not evidence_passed:
             return {**base, 'status': 'invalid',
-                    'reason': 'inconsistent passing receipt'}
+                    'reason': 'inconsistent task outcome'}
 
     resolved = sum(r['passed'] is True for r in receipts)
     return {**base, 'status': 'complete', 'resolved': resolved,
