@@ -10,7 +10,10 @@ receipt identifies which harness ran each task.
 
 This is **experimental**. Its thirteen tasks are a diagnostic starting point,
 not a complete quality test of a model, a quantisation, or an agent product.
-There is no overall ranking. The main [RigMark](https://github.com/alexellis/rigmark)
+There is no overall ranking. A complete, valid run reports its **task
+resolution rate**: the percentage of fixed tasks independently verified as
+solved on one attempt each. It is a result for that suite and agent setup,
+not a general model-quality percentage. The main [RigMark](https://github.com/alexellis/rigmark)
 repository remains the serving benchmark for prose, code, prefill, and
 concurrency; use `rigmark bench` there. This repository owns `rigmark quality`.
 
@@ -180,16 +183,26 @@ adjust the other limits. A provider may enforce a lower output limit. Report
 the requested limits and distinguish a budget stop from a failed task check.
 
 By default, `report` prints a compact ASCII card per model and suite hash.
-Use `--format json` for a machine-readable diagnostic matrix. Each task JSON
+The **TASK RESOLUTION** headline gives a percentage and its numerator and
+denominator only when every task has exactly one valid receipt. A task counts
+as resolved only when its independent checks pass and the conversation
+finishes. Incorrect work, a budget stop, or an unfinished conversation counts
+as unsolved. Missing or duplicate tasks, a model mismatch, or a transport,
+harness, or judge failure withholds the rate rather than silently changing the
+denominator. A 13-task suite changes by 7.7 percentage points for one task;
+one run has no confidence interval. Compare rates only with the same suite
+hash, harness, model/backend, reasoning setting, and limits.
+
+Use `--format json` for a machine-readable diagnostic matrix and per-run
+`resolution` objects. Each task JSON
 receipt records the requested and observed model, request limits, suite and
 task hashes, runtime image, checks, elapsed time, tool trace, and stop reason.
 The card deliberately separates **artefact passed** from **conversation
 finished**: correct code followed by a reasoning loop is a distinct outcome.
 Coding artefacts must pass both the final public tests and withheld checks;
 an agent's own failing regression test cannot count as a passing artefact.
-The card includes no overall pass percentage and no hardware or quantisation
-claim. Describe your serving appliance and quantisation separately, ideally
-with a RigMark bench receipt.
+The card makes no hardware or quantisation claim. Describe your serving
+appliance and quantisation separately, ideally with a RigMark bench receipt.
 
 ## What CI checks
 

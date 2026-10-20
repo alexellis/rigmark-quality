@@ -499,14 +499,14 @@ def report(output, format='ascii'):
             receipts.append(data)
     if not receipts:
         raise ValueError(f'no task receipts found in {output}')
+    groups = {}
+    for receipt in receipts:
+        request_signature = json.dumps(receipt.get('request', {}), sort_keys=True)
+        key = (receipt.get('suite_sha256', 'unknown'),
+               receipt['requested_model'],
+               receipt.get('run_group') or request_signature)
+        groups.setdefault(key, []).append(receipt)
     if format == 'ascii':
-        groups = {}
-        for receipt in receipts:
-            request_signature = json.dumps(receipt.get('request', {}), sort_keys=True)
-            key = (receipt.get('suite_sha256', 'unknown'),
-                   receipt['requested_model'],
-                   receipt.get('run_group') or request_signature)
-            groups.setdefault(key, []).append(receipt)
         for key, group in sorted(groups.items()):
             print(ascii_card(key, group))
         return
@@ -533,12 +533,72 @@ def report(output, format='ascii'):
         rows.append(row)
     summary = {'suite_version': receipts[0].get('suite_version', '?'),
                'interpretation': 'diagnostic_only',
-               'models': models, 'tasks': rows}
+               'models': models, 'tasks': rows,
+               'runs': [{'suite_sha256': key[0], 'requested_model': key[1],
+                         'run_group': key[2], 'resolution': resolution(group)}
+                        for key, group in sorted(groups.items())]}
     print(json.dumps(summary, indent=2))
 
 
+_THIRTEEN_TASKS = frozenset((
+    'python-expiry', 'node-idempotency', 'go-worker-pool',
+    'go-transfer-ledger', 'arkade-add', 'statement-redact',
+    'stock-transfer', 'payment-recovery', 'ticket-routing',
+    'evidence-revisions', 'multilingual-evidence',
+    'long-context-retrieval', 'security-boundary'))
+
+
+def resolution(receipts):
+    """Report a rate only for a complete, valid, single-attempt suite run."""
+    versions = {r.get('suite_version') for r in receipts}
+    if len(versions) != 1:
+        return {'status': 'invalid', 'reason': 'mixed suite versions',
+                'rate_percent': None}
+    version = versions.pop()
+    if version in ('0.6', '0.8'):
+        expected = _THIRTEEN_TASKS
+    elif receipts[0].get('suite_sha256') == suite_hash():
+        expected = frozenset(tasks.TASKS)
+    else:
+        return {'status': 'unscored', 'reason': 'suite task list unavailable',
+                'rate_percent': None}
+
+    task_ids = [r['task'] for r in receipts]
+    reported = len(set(task_ids) & expected)
+    base = {'reported': reported, 'total': len(expected),
+            'rate_percent': None}
+    if len(task_ids) != len(set(task_ids)) or set(task_ids) - expected:
+        return {**base, 'status': 'invalid',
+                'reason': 'duplicate or unexpected task receipts'}
+    if reported != len(expected):
+        return {**base, 'status': 'incomplete',
+                'reason': 'full suite not present'}
+
+    for receipt in receipts:
+        failure = str(receipt.get('failure') or '')
+        if (receipt.get('model_match') is not True or
+                failure.startswith(('transport_error:', 'harness_error:',
+                                    'model_mismatch', 'model_unverified',
+                                    'HTTPError:', 'URLError:', 'TimeoutError:')) or
+                not isinstance(receipt.get('checks'), dict) or
+                not receipt['checks']):
+            return {**base, 'status': 'invalid',
+                    'reason': 'model, transport, harness, or judge failure'}
+        if receipt['passed'] and not (
+                all(receipt['checks'].values()) and
+                receipt.get('artefact_passed') is True and
+                receipt.get('conversation_finished') is True and
+                receipt.get('failure') is None):
+            return {**base, 'status': 'invalid',
+                    'reason': 'inconsistent passing receipt'}
+
+    resolved = sum(r['passed'] is True for r in receipts)
+    return {**base, 'status': 'complete', 'resolved': resolved,
+            'rate_percent': round(100 * resolved / len(expected))}
+
+
 def ascii_card(key, receipts):
-    """A compact per-model receipt; no overall model-quality score."""
+    """A compact per-run receipt with an independently checked resolution rate."""
     suite_hash, model, _ = key
     typed_receipt = next((r for r in receipts
                           if not r.get('harness', '').endswith('opencode-native')), None)
@@ -559,16 +619,33 @@ def ascii_card(key, receipts):
 
     row()
     row('R I G M A R K   //   QUALITY TASK RECEIPT')
-    row('EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE')
+    row('EXPERIMENTAL · VERIFIED TASK RESOLUTION UNDER RECORDED SETTINGS')
     if receipts[0].get('suite_version') == '0.1':
         row('HISTORICAL PILOT · SETTINGS NOT MATCHED · DO NOT COMPARE MODELS')
+    elif receipts[0].get('suite_version') == '0.6':
+        row('HISTORICAL PROTOCOL 0.6 · ARKADE USED TYPED TOOLS')
     row()
     section('MODEL')
     row(model)
     row()
+    result = resolution(receipts)
+    section('TASK RESOLUTION')
+    if result['status'] == 'complete':
+        row(f"{result['rate_percent']}%  ·  {result['resolved']}/{result['total']} "
+            'tasks independently verified')
+        row('One attempt per task; unfinished or incorrect tasks count as unsolved.')
+    elif result['status'] == 'incomplete':
+        row(f"INCOMPLETE  ·  {result['reported']}/{result['total']} tasks reported")
+        row('No resolution rate until the full suite is present.')
+    else:
+        row(f"NO RESOLUTION RATE  ·  {result['reason']}")
+    row('Experimental run result, not an intrinsic model quality score.')
+    row()
     section('TASKS')
     row(f'{"TASK":27} {"ARTEFACT":9} {"FINISHED":9} {"TIME":8} STOP')
-    for receipt in sorted(receipts, key=lambda item: list(tasks.TASKS).index(item['task'])):
+    task_order = {task_id: index for index, task_id in enumerate(tasks.TASKS)}
+    for receipt in sorted(receipts,
+                          key=lambda item: task_order.get(item['task'], len(task_order))):
         checks = receipt.get('checks') or {}
         artefact = receipt.get('artefact_passed')
         if artefact is None:
