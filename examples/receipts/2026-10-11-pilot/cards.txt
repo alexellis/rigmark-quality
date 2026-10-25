@@ -1,12 +1,17 @@
 ╭────────────────────────────────────────────────────────────────────────────╮
 │                                                                            │
 │  R I G M A R K   //   QUALITY TASK RECEIPT                                 │
-│  EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE               │
+│  EXPERIMENTAL · VERIFIED TASK RESOLUTION UNDER RECORDED SETTINGS           │
 │  HISTORICAL PILOT · SETTINGS NOT MATCHED · DO NOT COMPARE MODELS           │
 │                                                                            │
 ├─ MODEL ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │  Qwen3.8-27B-FP8-vllm                                                      │
+│                                                                            │
+├─ TASK RESOLUTION ──────────────────────────────────────────────────────────┤
+│                                                                            │
+│  NO RESOLUTION RATE  ·  suite task list unavailable                        │
+│  Experimental run result, not an intrinsic model quality score.            │
 │                                                                            │
 ├─ TASKS ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
@@ -34,12 +39,17 @@
 ╭────────────────────────────────────────────────────────────────────────────╮
 │                                                                            │
 │  R I G M A R K   //   QUALITY TASK RECEIPT                                 │
-│  EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE               │
+│  EXPERIMENTAL · VERIFIED TASK RESOLUTION UNDER RECORDED SETTINGS           │
 │  HISTORICAL PILOT · SETTINGS NOT MATCHED · DO NOT COMPARE MODELS           │
 │                                                                            │
 ├─ MODEL ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │  Qwen3.8-27B-FP8-vllm                                                      │
+│                                                                            │
+├─ TASK RESOLUTION ──────────────────────────────────────────────────────────┤
+│                                                                            │
+│  NO RESOLUTION RATE  ·  suite task list unavailable                        │
+│  Experimental run result, not an intrinsic model quality score.            │
 │                                                                            │
 ├─ TASKS ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
@@ -59,12 +69,17 @@
 ╭────────────────────────────────────────────────────────────────────────────╮
 │                                                                            │
 │  R I G M A R K   //   QUALITY TASK RECEIPT                                 │
-│  EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE               │
+│  EXPERIMENTAL · VERIFIED TASK RESOLUTION UNDER RECORDED SETTINGS           │
 │  HISTORICAL PILOT · SETTINGS NOT MATCHED · DO NOT COMPARE MODELS           │
 │                                                                            │
 ├─ MODEL ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │  deepseek-v4-flash-0731                                                    │
+│                                                                            │
+├─ TASK RESOLUTION ──────────────────────────────────────────────────────────┤
+│                                                                            │
+│  NO RESOLUTION RATE  ·  suite task list unavailable                        │
+│  Experimental run result, not an intrinsic model quality score.            │
 │                                                                            │
 ├─ TASKS ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
@@ -92,12 +107,17 @@
 ╭────────────────────────────────────────────────────────────────────────────╮
 │                                                                            │
 │  R I G M A R K   //   QUALITY TASK RECEIPT                                 │
-│  EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE               │
+│  EXPERIMENTAL · VERIFIED TASK RESOLUTION UNDER RECORDED SETTINGS           │
 │  HISTORICAL PILOT · SETTINGS NOT MATCHED · DO NOT COMPARE MODELS           │
 │                                                                            │
 ├─ MODEL ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │  deepseek-v4-flash-0731                                                    │
+│                                                                            │
+├─ TASK RESOLUTION ──────────────────────────────────────────────────────────┤
+│                                                                            │
+│  NO RESOLUTION RATE  ·  suite task list unavailable                        │
+│  Experimental run result, not an intrinsic model quality score.            │
 │                                                                            │
 ├─ TASKS ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
@@ -117,12 +137,17 @@
 ╭────────────────────────────────────────────────────────────────────────────╮
 │                                                                            │
 │  R I G M A R K   //   QUALITY TASK RECEIPT                                 │
-│  EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE               │
+│  EXPERIMENTAL · VERIFIED TASK RESOLUTION UNDER RECORDED SETTINGS           │
 │  HISTORICAL PILOT · SETTINGS NOT MATCHED · DO NOT COMPARE MODELS           │
 │                                                                            │
 ├─ MODEL ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │  glm-5.3-flash                                                             │
+│                                                                            │
+├─ TASK RESOLUTION ──────────────────────────────────────────────────────────┤
+│                                                                            │
+│  NO RESOLUTION RATE  ·  suite task list unavailable                        │
+│  Experimental run result, not an intrinsic model quality score.            │
 │                                                                            │
 ├─ TASKS ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
@@ -150,12 +175,17 @@
 ╭────────────────────────────────────────────────────────────────────────────╮
 │                                                                            │
 │  R I G M A R K   //   QUALITY TASK RECEIPT                                 │
-│  EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE               │
+│  EXPERIMENTAL · VERIFIED TASK RESOLUTION UNDER RECORDED SETTINGS           │
 │  HISTORICAL PILOT · SETTINGS NOT MATCHED · DO NOT COMPARE MODELS           │
 │                                                                            │
 ├─ MODEL ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │  glm-5.3-flash                                                             │
+│                                                                            │
+├─ TASK RESOLUTION ──────────────────────────────────────────────────────────┤
+│                                                                            │
+│  NO RESOLUTION RATE  ·  suite task list unavailable                        │
+│  Experimental run result, not an intrinsic model quality score.            │
 │                                                                            │
 ├─ TASKS ────────────────────────────────────────────────────────────────────┤
 │                                                                            │

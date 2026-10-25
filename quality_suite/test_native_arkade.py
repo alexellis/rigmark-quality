@@ -102,6 +102,17 @@ class NativeArkadeTests(unittest.TestCase):
                     'message': 'Unexpected server error.'}}}) + '\n# exit code=1\n')
             self.assertEqual(native_arkade._agent_error(path),
                              'Unexpected server error.')
+            with self.assertRaises(native_arkade.TransportError):
+                native_arkade._require_agent_log_success(path)
+
+    def test_zero_exit_with_provider_error_is_not_a_coding_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'agent.jsonl'
+            path.write_text(json.dumps({
+                'type': 'error', 'error': {'data': {
+                    'message': 'Provider returned 502'}}}) + '\n# exit code=0\n')
+            with self.assertRaisesRegex(native_arkade.TransportError, '502'):
+                native_arkade._require_agent_log_success(path)
 
     def test_instruction_evidence_requires_successful_download_check(self):
         with tempfile.TemporaryDirectory() as directory:

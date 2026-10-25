@@ -27,6 +27,25 @@ def utc_now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def inspect_runtime_image(image):
+    try:
+        return runtime.image_id(image), None
+    except (OSError, subprocess.SubprocessError) as exc:
+        return None, f'runtime_image_error: {type(exc).__name__}: {exc}'
+
+
+def response_choice(data):
+    if not isinstance(data, dict):
+        raise ValueError('completion response is not an object')
+    choices = data.get('choices')
+    if not isinstance(choices, list) or not choices:
+        raise ValueError('completion choices must be a non-empty list')
+    choice = choices[0]
+    if not isinstance(choice, dict) or not isinstance(choice.get('message'), dict):
+        raise ValueError('completion choice has no message object')
+    return choice
+
+
 def suite_hash():
     digest = hashlib.sha256()
     root = Path(__file__).parent
@@ -104,6 +123,7 @@ def grade_coding(task_id, workspace, image, arkade_root):
                         ignore=shutil.ignore_patterns('.git'))
         public = runtime.run(public_candidate, image,
                              runtime.public_command(task_id), 120)
+        runtime.require_judge_started(public)
     with tempfile.TemporaryDirectory(prefix='rigmark-accept-') as directory:
         candidate = Path(directory) / 'candidate'
         shutil.copytree(workspace, candidate, ignore=shutil.ignore_patterns('.git'))
@@ -113,6 +133,7 @@ def grade_coding(task_id, workspace, image, arkade_root):
             target.write_text(content)
         result = runtime.run(candidate, image, runtime.acceptance_command(task_id),
                              90 if task_id == 'go-worker-pool' else 45)
+        runtime.require_judge_started(result)
     checks = {'acceptance': result['exit_code'] == 0 and not result['timeout'],
               'public_tests': public['exit_code'] == 0 and not public['timeout']}
     result['public_tests'] = public
@@ -128,6 +149,8 @@ def grade_coding(task_id, workspace, image, arkade_root):
             '--user=1000:1000', '-v', f'{workspace.resolve()}:/workspace:ro',
             '-w', '/workspace', image, 'gofmt', '-l', source_name, test_name],
             text=True, capture_output=True, timeout=30)
+        runtime.require_judge_started({'exit_code': formatted.returncode,
+                                       'output': formatted.stderr})
         checks['gofmt'] = formatted.returncode == 0 and not formatted.stdout.strip()
     return checks, result
 
@@ -150,6 +173,7 @@ def grade_statement(workspace, image):
             run = runtime.run(candidate, image,
                               'python3 -B redact_statement.py bank_statement.pdf redacted.pdf',
                               90)
+            runtime.require_judge_started(run)
             timed_out |= run['timeout']
             if run['exit_code'] != 0 or run['timeout'] or not (candidate / 'redacted.pdf').exists():
                 checks[name] = False
@@ -165,16 +189,38 @@ rows = tuple(Transaction(**row) for row in rows) if rows else ROWS
 print(json.dumps(judge("redacted.pdf", rows)))
 ''')
             judged = runtime.run(candidate, image, 'python3 -B judge_run.py', 90)
+            runtime.require_judge_started(judged)
             timed_out |= judged['timeout']
             try:
-                verdict = json.loads(judged['output'].strip()) if judged['exit_code'] == 0 else {}
-            except ValueError:
-                verdict = {}
+                verdict = (statement_verdict(judged['output'])
+                           if judged['exit_code'] == 0 else {})
+            except ValueError as exc:
+                raise RuntimeError('statement judge returned invalid output') from exc
             checks[name] = bool(verdict) and all(verdict.values())
             details[name] = {'execution': run, 'judge': verdict,
                              'judge_error': judged['output'] if not verdict else ''}
     return checks, {'exit_code': 0 if all(checks.values()) else 1,
                     'timeout': timed_out, 'output': json.dumps(details)}
+
+
+_STATEMENT_CHECKS = frozenset((
+    'valid_pdf', 'transaction_count', 'transaction_order',
+    'dates_amounts_balances', 'other_text_preserved',
+    'no_extractable_sender_names', 'no_visible_sender_names'))
+
+
+def statement_verdict(output):
+    """Reject malformed judge output rather than scoring it as model failure."""
+    verdict = json.loads(output.strip())
+    if not isinstance(verdict, dict) or type(verdict.get('valid_pdf')) is not bool:
+        raise ValueError('expected a statement verdict object')
+    if verdict['valid_pdf'] is False:
+        if set(verdict) != {'valid_pdf'}:
+            raise ValueError('invalid PDF verdict has unexpected fields')
+    elif set(verdict) != _STATEMENT_CHECKS or any(
+            type(value) is not bool for value in verdict.values()):
+        raise ValueError('statement verdict fields are incomplete')
+    return verdict
 
 
 def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
@@ -198,6 +244,7 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
     started = time.monotonic()
     event_log = []
     failure = None
+    failure_category = None
     answer = ''
     observed_models = []
     conversation_finished = False
@@ -205,17 +252,20 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
         remaining = seconds - (time.monotonic() - started)
         if remaining <= 0:
             failure = 'task deadline exceeded'
+            failure_category = 'budget'
             break
         if max_steps and step >= max_steps:
             failure = 'model turn limit exceeded'
+            failure_category = 'budget'
             break
         try:
             data = completion(endpoint, model, messages, box.definitions, auth_file,
                               max(1, remaining), reasoning_effort,
                               thinking, max_output_tokens, api_key_env)
+            choice = response_choice(data)
             observed_models.append(data.get('model'))
-            msg = data['choices'][0]['message']
-            finish_reason = data['choices'][0].get('finish_reason')
+            msg = choice['message']
+            finish_reason = choice.get('finish_reason')
             event_log.append({'step': step + 1, 'finish_reason': finish_reason,
                               'message': msg, 'usage': data.get('usage')})
             calls = msg.get('tool_calls') or []
@@ -224,8 +274,10 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
                 answer = msg.get('content') or ''
                 if finish_reason == 'length':
                     failure = 'model exhausted output token cap'
+                    failure_category = 'budget'
                 elif not answer.strip():
                     failure = 'model returned no final answer or tool call'
+                    failure_category = 'task'
                 else:
                     conversation_finished = True
                 break
@@ -241,6 +293,7 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
                     notice = reminder
                 if stop:
                     failure = stop
+                    failure_category = 'task'
             if failure:
                 break
             reminder, stop = guard.exploration(step + 1,
@@ -249,18 +302,27 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
                 notice = reminder
             if stop:
                 failure = stop
+                failure_category = 'task'
                 break
             if notice:
                 messages.append({'role': 'user', 'content': notice})
-        except (error.URLError, TimeoutError, KeyError, IndexError, ValueError) as exc:
+        except (error.URLError, TimeoutError, KeyError, IndexError, ValueError,
+                TypeError, AttributeError) as exc:
             failure = f'{type(exc).__name__}: {exc}'
+            failure_category = 'infrastructure'
             break
-    if task_id in ('python-expiry', 'node-idempotency', 'go-worker-pool',
-                   'go-transfer-ledger', 'statement-redact'):
-        checks, acceptance = grade_coding(task_id, workspace, image, arkade_root)
-    else:
-        checks = box.grade(answer)
-        acceptance = None
+    try:
+        if task_id in ('python-expiry', 'node-idempotency', 'go-worker-pool',
+                       'go-transfer-ledger', 'statement-redact'):
+            checks, acceptance = grade_coding(task_id, workspace, image, arkade_root)
+        else:
+            checks = box.grade(answer)
+            acceptance = None
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+        checks = {}
+        acceptance = {'judge_error': str(exc)}
+        failure = f'judge_error: {exc}'
+        failure_category = 'infrastructure'
     # Toilgate returns the backend checkpoint for this public GLM alias.
     aliases = {'glm-5.3-flash': 'nvidia/GLM-5.3-Flash-NVFP4'}
     clean_models = bool(observed_models) and set(observed_models) == {aliases.get(model, model)}
@@ -304,6 +366,10 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
         usage['completion_tokens'] += item.get('completion_tokens') or 0
         details = item.get('completion_tokens_details') or {}
         usage['reasoning_tokens'] += details.get('reasoning_tokens') or 0
+    runtime_image_id, runtime_image_error = inspect_runtime_image(image)
+    if runtime_image_error:
+        failure = failure or runtime_image_error
+        failure_category = 'infrastructure'
     result = {'task': task_id, 'category': tasks.TASKS[task_id]['category'],
               'interpretation': 'diagnostic_only',
               'task_status': ('exploratory' if task_id == 'statement-redact'
@@ -316,7 +382,7 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
                           'reasoning_effort': reasoning_effort,
                           'thinking': thinking},
               'arkade_revision': tasks.ARKADE_REVISION if task_id == 'arkade-add' else None,
-              'runtime_image_id': runtime.image_id(image),
+              'runtime_image_id': runtime_image_id,
               'requested_model': model, 'observed_models': observed_models,
               'model_match': clean_models, 'started_at': started_at,
               'finished_at': utc_now(),
@@ -327,11 +393,13 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
                                         'loop_detected': len(words) >= 100 and repetition_fraction >= 0.5},
               'tool_diagnostics': tool_diagnostics,
               'steps': len(event_log), 'checks': checks,
-              'artefact_passed': all(checks.values()) and clean_models,
+              'artefact_passed': bool(checks) and all(checks.values()) and clean_models,
               'conversation_finished': conversation_finished,
               'governor_notices': guard.notices,
-              'passed': all(checks.values()) and clean_models and failure is None,
-              'failure': failure, 'answer': answer,
+              'passed': bool(checks) and all(checks.values())
+              and clean_models and failure is None,
+              'failure': failure, 'failure_category': failure_category,
+              'answer': answer,
               'calls': box.calls, 'events': event_log, 'acceptance': acceptance,
               'changes': changes}
     return result
@@ -499,14 +567,14 @@ def report(output, format='ascii'):
             receipts.append(data)
     if not receipts:
         raise ValueError(f'no task receipts found in {output}')
+    groups = {}
+    for receipt in receipts:
+        request_signature = json.dumps(receipt.get('request', {}), sort_keys=True)
+        key = (receipt.get('suite_sha256', 'unknown'),
+               receipt['requested_model'],
+               receipt.get('run_group') or request_signature)
+        groups.setdefault(key, []).append(receipt)
     if format == 'ascii':
-        groups = {}
-        for receipt in receipts:
-            request_signature = json.dumps(receipt.get('request', {}), sort_keys=True)
-            key = (receipt.get('suite_sha256', 'unknown'),
-                   receipt['requested_model'],
-                   receipt.get('run_group') or request_signature)
-            groups.setdefault(key, []).append(receipt)
         for key, group in sorted(groups.items()):
             print(ascii_card(key, group))
         return
@@ -522,7 +590,9 @@ def report(output, format='ascii'):
             if len(matches) == 1:
                 r = matches[0]
                 row[model] = {'passed': r['passed'], 'checks': r['checks'],
-                              'failure': r['failure'], 'elapsed_seconds': r['elapsed_seconds'],
+                              'failure': r['failure'],
+                              'failure_category': r.get('failure_category'),
+                              'elapsed_seconds': r['elapsed_seconds'],
                               'model_match': r['model_match'],
                               'artefact_passed': r.get('artefact_passed'),
                               'conversation_finished': r.get('conversation_finished')}
@@ -533,12 +603,79 @@ def report(output, format='ascii'):
         rows.append(row)
     summary = {'suite_version': receipts[0].get('suite_version', '?'),
                'interpretation': 'diagnostic_only',
-               'models': models, 'tasks': rows}
+               'models': models, 'tasks': rows,
+               'runs': [{'suite_sha256': key[0], 'requested_model': key[1],
+                         'run_group': key[2], 'resolution': resolution(group)}
+                        for key, group in sorted(groups.items())]}
     print(json.dumps(summary, indent=2))
 
 
+_THIRTEEN_TASKS = frozenset((
+    'python-expiry', 'node-idempotency', 'go-worker-pool',
+    'go-transfer-ledger', 'arkade-add', 'statement-redact',
+    'stock-transfer', 'payment-recovery', 'ticket-routing',
+    'evidence-revisions', 'multilingual-evidence',
+    'long-context-retrieval', 'security-boundary'))
+
+
+def resolution(receipts):
+    """Report a rate only for a complete, valid, single-attempt suite run."""
+    versions = {r.get('suite_version') for r in receipts}
+    if len(versions) != 1:
+        return {'status': 'invalid', 'reason': 'mixed suite versions',
+                'rate_percent': None}
+    version = versions.pop()
+    if version in ('0.6', '0.8'):
+        expected = _THIRTEEN_TASKS
+    elif receipts[0].get('suite_sha256') == suite_hash():
+        expected = frozenset(tasks.TASKS)
+    else:
+        return {'status': 'unscored', 'reason': 'suite task list unavailable',
+                'rate_percent': None}
+
+    task_ids = [r['task'] for r in receipts]
+    reported = len(set(task_ids) & expected)
+    base = {'reported': reported, 'total': len(expected),
+            'rate_percent': None}
+    if len(task_ids) != len(set(task_ids)) or set(task_ids) - expected:
+        return {**base, 'status': 'invalid',
+                'reason': 'duplicate or unexpected task receipts'}
+    if reported != len(expected):
+        return {**base, 'status': 'incomplete',
+                'reason': 'full suite not present'}
+
+    for receipt in receipts:
+        failure = str(receipt.get('failure') or '')
+        category = receipt.get('failure_category')
+        legacy_failure = (failure and category is None and
+                          failure not in ('time_budget', 'tool step budget exhausted',
+                                          'task deadline exceeded',
+                                          'model turn limit exceeded',
+                                          'model exhausted output token cap',
+                                          'model returned no final answer or tool call') and
+                          not failure.startswith('no_progress:'))
+        if (receipt.get('model_match') is not True or
+                category not in (None, 'task', 'budget') or
+                legacy_failure or
+                not isinstance(receipt.get('checks'), dict) or
+                not receipt['checks']):
+            return {**base, 'status': 'invalid',
+                    'reason': 'model, transport, harness, or judge failure'}
+        evidence_passed = (all(receipt['checks'].values()) and
+                           receipt.get('artefact_passed') is True and
+                           receipt.get('conversation_finished') is True and
+                           receipt.get('failure') is None)
+        if receipt.get('passed') is not evidence_passed:
+            return {**base, 'status': 'invalid',
+                    'reason': 'inconsistent task outcome'}
+
+    resolved = sum(r['passed'] is True for r in receipts)
+    return {**base, 'status': 'complete', 'resolved': resolved,
+            'rate_percent': round(100 * resolved / len(expected))}
+
+
 def ascii_card(key, receipts):
-    """A compact per-model receipt; no overall model-quality score."""
+    """A compact per-run receipt with an independently checked resolution rate."""
     suite_hash, model, _ = key
     typed_receipt = next((r for r in receipts
                           if not r.get('harness', '').endswith('opencode-native')), None)
@@ -559,16 +696,33 @@ def ascii_card(key, receipts):
 
     row()
     row('R I G M A R K   //   QUALITY TASK RECEIPT')
-    row('EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE')
+    row('EXPERIMENTAL · VERIFIED TASK RESOLUTION UNDER RECORDED SETTINGS')
     if receipts[0].get('suite_version') == '0.1':
         row('HISTORICAL PILOT · SETTINGS NOT MATCHED · DO NOT COMPARE MODELS')
+    elif receipts[0].get('suite_version') == '0.6':
+        row('HISTORICAL PROTOCOL 0.6 · ARKADE USED TYPED TOOLS')
     row()
     section('MODEL')
     row(model)
     row()
+    result = resolution(receipts)
+    section('TASK RESOLUTION')
+    if result['status'] == 'complete':
+        row(f"{result['rate_percent']}%  ·  {result['resolved']}/{result['total']} "
+            'tasks independently verified')
+        row('One attempt per task; unfinished or incorrect tasks count as unsolved.')
+    elif result['status'] == 'incomplete':
+        row(f"INCOMPLETE  ·  {result['reported']}/{result['total']} tasks reported")
+        row('No resolution rate until the full suite is present.')
+    else:
+        row(f"NO RESOLUTION RATE  ·  {result['reason']}")
+    row('Experimental run result, not an intrinsic model quality score.')
+    row()
     section('TASKS')
     row(f'{"TASK":27} {"ARTEFACT":9} {"FINISHED":9} {"TIME":8} STOP')
-    for receipt in sorted(receipts, key=lambda item: list(tasks.TASKS).index(item['task'])):
+    task_order = {task_id: index for index, task_id in enumerate(tasks.TASKS)}
+    for receipt in sorted(receipts,
+                          key=lambda item: task_order.get(item['task'], len(task_order))):
         checks = receipt.get('checks') or {}
         artefact = receipt.get('artefact_passed')
         if artefact is None:
@@ -718,7 +872,12 @@ def main():
                 spec = {'task': tasks.TASKS[task_id], 'prompt': native_arkade.PROMPT}
                 result['task_sha256'] = hashlib.sha256(
                     json.dumps(spec, sort_keys=True).encode()).hexdigest()
-                result['runtime_image_id'] = runtime.image_id(args.image)
+                result['runtime_image_id'], runtime_image_error = inspect_runtime_image(
+                    args.image)
+                if runtime_image_error:
+                    result['failure'] = result.get('failure') or runtime_image_error
+                    result['failure_category'] = 'infrastructure'
+                    result['passed'] = False
                 result['request'] = {'agent_model': agent_model,
                                      'agent_variant': args.reasoning_effort,
                                      'task_seconds': args.seconds,

@@ -1,11 +1,18 @@
 ╭────────────────────────────────────────────────────────────────────────────╮
 │                                                                            │
 │  R I G M A R K   //   QUALITY TASK RECEIPT                                 │
-│  EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE               │
+│  EXPERIMENTAL · VERIFIED TASK RESOLUTION UNDER RECORDED SETTINGS           │
+│  HISTORICAL PROTOCOL 0.6 · ARKADE USED TYPED TOOLS                         │
 │                                                                            │
 ├─ MODEL ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │  deepseek-v4-flash-0731                                                    │
+│                                                                            │
+├─ TASK RESOLUTION ──────────────────────────────────────────────────────────┤
+│                                                                            │
+│  85%  ·  11/13 tasks independently verified                                │
+│  One attempt per task; unfinished or incorrect tasks count as unsolved.    │
+│  Experimental run result, not an intrinsic model quality score.            │
 │                                                                            │
 ├─ TASKS ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
@@ -37,11 +44,18 @@
 ╭────────────────────────────────────────────────────────────────────────────╮
 │                                                                            │
 │  R I G M A R K   //   QUALITY TASK RECEIPT                                 │
-│  EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE               │
+│  EXPERIMENTAL · VERIFIED TASK RESOLUTION UNDER RECORDED SETTINGS           │
+│  HISTORICAL PROTOCOL 0.6 · ARKADE USED TYPED TOOLS                         │
 │                                                                            │
 ├─ MODEL ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │  glm-5.3-flash                                                             │
+│                                                                            │
+├─ TASK RESOLUTION ──────────────────────────────────────────────────────────┤
+│                                                                            │
+│  77%  ·  10/13 tasks independently verified                                │
+│  One attempt per task; unfinished or incorrect tasks count as unsolved.    │
+│  Experimental run result, not an intrinsic model quality score.            │
 │                                                                            │
 ├─ TASKS ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
