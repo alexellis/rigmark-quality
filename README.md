@@ -8,6 +8,13 @@ inside a disposable Docker container with the complete repository, its
 `AGENTS.md`, and a terminal. Slicer remains an optional agent runner. The
 receipt identifies which harness ran each task.
 
+**AI-assisted workflow:** This repository was built and tested with Codex. It is
+designed to be driven by a capable AI coding agent, rather than followed as a
+universal step-by-step manual. Give the agent the full checkout, ask it to read
+this README and any `AGENTS.md`, adapt the commands to your environment, run the
+checks, and investigate errors from their output. Review machine-specific
+changes before applying them.
+
 This is **experimental**. Its thirteen tasks are a diagnostic starting point,
 not a complete quality test of a model, a quantisation, or an agent product.
 There is no overall ranking. The main [RigMark](https://github.com/alexellis/rigmark)
