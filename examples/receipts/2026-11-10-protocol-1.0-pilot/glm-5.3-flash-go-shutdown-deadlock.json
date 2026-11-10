@@ -1,0 +1,67 @@
+{
+  "task": "go-shutdown-deadlock",
+  "category": "coding",
+  "interpretation": "diagnostic_only",
+  "task_status": "experimental",
+  "suite_version": "1.0",
+  "suite_sha256": "5da4b9af79e46f55983d6b6c7955c7963187892eb1c9a6ef91c7cf747737fdee",
+  "task_sha256": "184bbff65bb0bead31d482eeb957ee203903683ae2fb4251fe10617985a39eba",
+  "request": {
+    "temperature": 0,
+    "top_p": 1,
+    "seed": 20261011,
+    "max_tokens": 32768,
+    "max_steps": 0,
+    "task_seconds": 1800,
+    "reasoning_effort": "low",
+    "thinking": "default"
+  },
+  "arkade_revision": null,
+  "runtime_image_id": "sha256:047a9c305e557e5631298dd058b04ab40fbbc0713d05c844b7c528b55241e14e",
+  "requested_model": "glm-5.3-flash",
+  "observed_models": [
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4"
+  ],
+  "model_match": true,
+  "started_at": "2026-11-09T10:54:05.966898+00:00",
+  "finished_at": "2026-11-09T10:54:53.389462+00:00",
+  "elapsed_seconds": 47.4,
+  "usage": {
+    "prompt_tokens": 12807,
+    "completion_tokens": 1247,
+    "reasoning_tokens": 185
+  },
+  "reasoning_diagnostics": {
+    "characters": 774,
+    "repeated_trigram_fraction": 0.016,
+    "loop_detected": false
+  },
+  "tool_diagnostics": {
+    "parsed_calls": 9,
+    "invalid_calls": 0,
+    "no_call_or_answer": false,
+    "unfinished_after_tool": false,
+    "unparsed_tool_markup": false
+  },
+  "steps": 7,
+  "checks": {
+    "acceptance": true,
+    "public_tests": true,
+    "regression_test_added": true,
+    "regression_fails_on_original": true,
+    "gofmt": true
+  },
+  "artefact_passed": true,
+  "conversation_finished": true,
+  "passed": true,
+  "failure": null,
+  "review_output_format": null,
+  "receipt_kind": "public_summary",
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot. Conversation, tool calls, file diffs, and endpoint details omitted."
+}

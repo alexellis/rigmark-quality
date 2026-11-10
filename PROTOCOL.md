@@ -1,6 +1,6 @@
 # Experimental quality protocol
 
-Protocol 0.8 uses thirteen fixed tasks. It is a diagnostic suite, not a
+Protocol 1.0 uses nineteen fixed tasks. It is a diagnostic suite, not a
 quality score. A receipt is one model attempt on one task. It records the
 requested and observed model, the complete request settings, task/suite
 hashes, runtime image, elapsed time, tool calls, file diffs, independent
@@ -25,11 +25,32 @@ training data. It reports file artefact correctness separately from whether
 the conversation reached a final answer.
 A task can have correct code and an unfinished conversation.
 
-Twelve tasks use the restricted typed-tool harness. Coding checks run in an
+Eighteen tasks use the restricted typed-tool harness. Coding checks run in an
 offline Docker container with a read-only root, resource limits, and no
 Docker socket. That interface is a significant harness choice; its results
 are not ordinary terminal-agent results. The document and refusal tasks
 remain exploratory. The refusal check is a smoke test, not a cyber benchmark.
+
+Two SQLite tasks extend that harness. `sqlite-migration` checks preservation
+of all invoice lines, safe reruns, and rollback of conflicting or caller-owned
+transactions. `sqlite-report` checks exact results on fresh data and whether
+SQLite uses explicit indexes for filtered orders and joined lines. The latter
+is a query-design diagnostic, not a cross-machine timing benchmark.
+
+Four harder diagnostics extend the harness. `go-shutdown-deadlock` grades a
+forced shutdown interleaving and preserves accepted work. The paired
+`go-concurrency-review` asks for a concrete finding in one dispatcher and no
+finding in its safe twin; its text-based causal-evidence check is a review
+calibration aid, not an executable proof. `go-export-boundary` checks that a
+cross-account request fails while legitimate owners retain access.
+`c-frame-bounds` checks malformed inputs with AddressSanitizer and UBSan.
+For the three repair tasks, the candidate's own regression test must pass
+with its fix and fail when the original broken source is restored. A compile
+error on the restored source does not count as a reproducer.
+The review task remains experimental until its calibration is supported by
+multiple independent model runs.
+The review receipt records plain versus fenced JSON separately from the
+substantive finding, so a formatting slip does not erase a correct diagnosis.
 
 `arkade-add` is a native-agent task. By default, a disposable Docker container
 runs OpenCode against the entire pinned arkade checkout with its real

@@ -11,7 +11,7 @@
 - Keep artefact correctness separate from conversation completion. Do not turn
   a correct file followed by a reasoning loop into an unqualified pass.
 - `selftest` checks both graders without calling a model. `run` calls a model;
-  omit `--task` for all 13 tasks. `arkade-add` uses a disposable Docker
+  omit `--task` for all 19 tasks. `arkade-add` uses a disposable Docker
   OpenCode container by default, or Slicer with `--agent-runner slicer`;
   the other tasks use typed tools. `report` renders receipts.
 - Build the offline judge image and native agent image, and run the

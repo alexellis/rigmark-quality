@@ -1,0 +1,63 @@
+{
+  "task": "go-concurrency-review",
+  "category": "review",
+  "interpretation": "diagnostic_only",
+  "task_status": "experimental",
+  "suite_version": "1.0",
+  "suite_sha256": "5da4b9af79e46f55983d6b6c7955c7963187892eb1c9a6ef91c7cf747737fdee",
+  "task_sha256": "05364d05afbf46f3d131b2bc3b82309e406c4c2f87ff72b56c6ba72b00bbd7a6",
+  "request": {
+    "temperature": 0,
+    "top_p": 1,
+    "seed": 20261011,
+    "max_tokens": 32768,
+    "max_steps": 0,
+    "task_seconds": 1800,
+    "reasoning_effort": "low",
+    "thinking": "default"
+  },
+  "arkade_revision": null,
+  "runtime_image_id": "sha256:047a9c305e557e5631298dd058b04ab40fbbc0713d05c844b7c528b55241e14e",
+  "requested_model": "DeepSeek-V4.1-Flash-1017",
+  "observed_models": [
+    "DeepSeek-V4.1-Flash-1017",
+    "DeepSeek-V4.1-Flash-1017",
+    "DeepSeek-V4.1-Flash-1017"
+  ],
+  "model_match": true,
+  "started_at": "2026-11-09T10:53:52.953042+00:00",
+  "finished_at": "2026-11-09T10:54:06.734558+00:00",
+  "elapsed_seconds": 13.8,
+  "usage": {
+    "prompt_tokens": 3233,
+    "completion_tokens": 1020,
+    "reasoning_tokens": 465
+  },
+  "reasoning_diagnostics": {
+    "characters": 2015,
+    "repeated_trigram_fraction": 0.058,
+    "loop_detected": false
+  },
+  "tool_diagnostics": {
+    "parsed_calls": 5,
+    "invalid_calls": 0,
+    "no_call_or_answer": false,
+    "unfinished_after_tool": false,
+    "unparsed_tool_markup": false
+  },
+  "steps": 3,
+  "checks": {
+    "json_contract": true,
+    "real_issue": true,
+    "no_false_positive": true,
+    "causal_evidence": true,
+    "inspected_both": true
+  },
+  "artefact_passed": true,
+  "conversation_finished": true,
+  "passed": true,
+  "failure": null,
+  "review_output_format": "fenced_json",
+  "receipt_kind": "public_summary",
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot. Conversation, tool calls, file diffs, and endpoint details omitted."
+}

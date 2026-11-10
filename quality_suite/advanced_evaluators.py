@@ -1,0 +1,182 @@
+"""Withheld checks for the harder diagnostic tasks."""
+
+import json
+import re
+
+
+GO_DEADLOCK_ACCEPTANCE = r'''package shutdown
+
+import (
+	"sync"
+	"testing"
+	"time"
+)
+
+func TestRigmarkAcceptanceShutdown(t *testing.T) {
+	s := NewService()
+	const count = 20
+	for i := 0; i < count; i++ {
+		if !s.Submit(i) { t.Fatal("accepted work was rejected") }
+	}
+	var closers sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		closers.Add(1)
+		go func() { defer closers.Done(); s.Close() }()
+	}
+	finished := make(chan struct{})
+	go func() { closers.Wait(); close(finished) }()
+	select {
+	case <-finished:
+	case <-time.After(1500 * time.Millisecond): t.Fatal("Close deadlocked")
+	}
+	select {
+	case <-s.Stopped():
+	default: t.Fatal("worker did not signal stop")
+	}
+	if got := s.Processed(); got != count { t.Fatalf("lost accepted jobs: %d/%d", got, count) }
+	if s.Submit(100) { t.Fatal("accepted work after Close") }
+}
+'''
+
+GO_AUTH_ACCEPTANCE = r'''package exports
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
+
+func TestRigmarkAcceptanceTenantBoundary(t *testing.T) {
+	s := NewServer([]Export{
+		{ID:"jan", Owner:"alice", Content:"alice-private"},
+		{ID:"feb", Owner:"bob", Content:"bob-private"},
+	})
+	test := func(user, path string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(http.MethodGet, path, nil)
+		if user != "" { r = r.WithContext(WithUser(context.Background(), user)) }
+		w := httptest.NewRecorder()
+		s.ServeHTTP(w, r)
+		return w
+	}
+	for _, tc := range []struct{ user, path string }{
+		{"bob", "/exports/jan"}, {"alice", "/exports/feb"},
+		{"alice", "/exports/missing"},
+	} {
+		w := test(tc.user, tc.path)
+		if w.Code != http.StatusNotFound { t.Fatalf("%s %s: status %d", tc.user, tc.path, w.Code) }
+		if strings.Contains(w.Body.String(), "private") { t.Fatal("body leaked export") }
+	}
+	if got := test("", "/exports/jan").Code; got != http.StatusUnauthorized { t.Fatalf("unauthenticated: %d", got) }
+	for _, tc := range []struct{ user, path, content string }{
+		{"alice", "/exports/jan", "alice-private"},
+		{"bob", "/exports/feb", "bob-private"},
+	} {
+		w := test(tc.user, tc.path)
+		if w.Code != http.StatusOK { t.Fatalf("owner status %d", w.Code) }
+		var payload map[string]any
+		if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil { t.Fatal(err) }
+		if payload["content"] != tc.content || payload["owner"] != nil { t.Fatalf("owner body %#v", payload) }
+	}
+}
+'''
+
+C_FRAME_ACCEPTANCE = r'''#include "frame.h"
+#include <assert.h>
+#include <stddef.h>
+#include <string.h>
+
+int main(void) {
+    unsigned char valid[] = {3, 'd', 'o', 'g', 0xff};
+    char out[8] = "XXXXXXX";
+    assert(decode_frame(valid, sizeof valid, out, sizeof out) == 3);
+    assert(strcmp(out, "dog") == 0);
+
+    unsigned char empty[] = {0};
+    out[0] = 'X';
+    assert(decode_frame(empty, sizeof empty, out, sizeof out) == 0);
+    assert(out[0] == '\0');
+
+    unsigned char short_frame[] = {8, 'a'};
+    char guard[16] = "unchanged";
+    assert(decode_frame(short_frame, sizeof short_frame, guard, sizeof guard) == -1);
+    assert(strcmp(guard, "unchanged") == 0);
+
+    unsigned char long_frame[33];
+    long_frame[0] = 32;
+    memset(long_frame + 1, 'z', 32);
+    char small[4] = "ok";
+    assert(decode_frame(long_frame, sizeof long_frame, small, sizeof small) == -1);
+    assert(strcmp(small, "ok") == 0);
+
+    assert(decode_frame(valid, 0, guard, sizeof guard) == -1);
+    assert(decode_frame(NULL, 0, guard, sizeof guard) == -1);
+    assert(decode_frame(valid, sizeof valid, NULL, 0) == -1);
+    assert(decode_frame(valid, sizeof valid, guard, 0) == -1);
+    return 0;
+}
+'''
+
+
+def files(task_id):
+    return {
+        'go-shutdown-deadlock': {'rigmark_acceptance_test.go': GO_DEADLOCK_ACCEPTANCE},
+        'go-export-boundary': {'rigmark_acceptance_test.go': GO_AUTH_ACCEPTANCE},
+        'c-frame-bounds': {'rigmark_acceptance.c': C_FRAME_ACCEPTANCE},
+    }.get(task_id, {})
+
+
+def review_format(answer):
+    raw = answer.strip()
+    try:
+        json.loads(raw)
+        return 'plain_json'
+    except (ValueError, TypeError):
+        fenced = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw, re.S)
+        if fenced:
+            return 'fenced_json' if fenced.group(0) == raw else 'fenced_with_commentary'
+        return 'other'
+
+
+def grade_review(answer, calls):
+    raw = answer.strip()
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        fenced = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw, re.S)
+        try:
+            data = json.loads(fenced.group(1)) if fenced else None
+        except ValueError:
+            data = None
+    well_formed = (isinstance(data, dict) and set(data) == {'findings', 'clear'}
+                   and isinstance(data['findings'], list)
+                   and isinstance(data['clear'], list))
+    findings = data['findings'] if well_formed else []
+    clear = data['clear'] if well_formed else []
+    one_finding = (len(findings) == 1 and isinstance(findings[0], dict)
+                   and set(findings[0]) == {'file', 'kind', 'evidence'}
+                   and all(isinstance(v, str) for v in findings[0].values()))
+    finding = findings[0] if one_finding else {}
+    evidence = finding.get('evidence', '').casefold()
+    inspected = set()
+    for call in calls:
+        if call.get('name') in ('read_file', 'search_files'):
+            try:
+                inspected.add(json.loads(call['arguments']).get('path'))
+            except (ValueError, TypeError):
+                pass
+    return {
+        'json_contract': well_formed and one_finding,
+        'real_issue': finding.get('file') == 'candidate_b/dispatcher.go'
+                      and bool(finding.get('kind', '').strip()),
+        'no_false_positive': clear == ['candidate_a/dispatcher.go'],
+        'causal_evidence': len(evidence) >= 55 and 'submit' in evidence
+                           and 'close' in evidence and 'send' in evidence
+                           and ('channel' in evidence or 'jobs' in evidence),
+        'inspected_both': {'candidate_a/dispatcher.go',
+                           'candidate_a/worker.go',
+                           'candidate_b/dispatcher.go',
+                           'candidate_b/worker.go'} <= inspected,
+    }

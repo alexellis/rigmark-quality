@@ -20,7 +20,7 @@ import textwrap
 import uuid
 from urllib import error, parse, request
 
-from . import evaluators, governor, native_arkade, runtime, tasks, tools
+from . import advanced_evaluators, advanced_tasks, evaluators, governor, native_arkade, runtime, tasks, tools
 
 
 def utc_now():
@@ -112,17 +112,44 @@ def grade_coding(task_id, workspace, image, arkade_root):
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content)
         result = runtime.run(candidate, image, runtime.acceptance_command(task_id),
-                             90 if task_id == 'go-worker-pool' else 45)
+                             90 if task_id in ('go-worker-pool', 'go-shutdown-deadlock',
+                                                'go-export-boundary') else 45)
     checks = {'acceptance': result['exit_code'] == 0 and not result['timeout'],
               'public_tests': public['exit_code'] == 0 and not public['timeout']}
     result['public_tests'] = public
     test_name = {'python-expiry': 'test_expiry.py',
                  'node-idempotency': 'store.test.js',
                  'go-worker-pool': 'pool_test.go',
-                 'go-transfer-ledger': 'transfer_test.go'}[task_id]
+                 'go-transfer-ledger': 'transfer_test.go',
+                 'sqlite-migration': 'test_migration.py',
+                 'sqlite-report': 'test_report.py',
+                 'go-shutdown-deadlock': 'service_test.go',
+                 'go-export-boundary': 'server_test.go',
+                 'c-frame-bounds': 'frame_test.c'}[task_id]
     checks['regression_test_added'] = len((workspace / test_name).read_text()) > len(tasks.TASKS[task_id]['files'][test_name]) + 20
-    if task_id in ('go-worker-pool', 'go-transfer-ledger'):
-        source_name = 'pool.go' if task_id == 'go-worker-pool' else 'transfer.go'
+    if task_id in ('go-shutdown-deadlock', 'go-export-boundary', 'c-frame-bounds'):
+        source_name = {'go-shutdown-deadlock': 'service.go',
+                       'go-export-boundary': 'server.go',
+                       'c-frame-bounds': 'frame.c'}[task_id]
+        with tempfile.TemporaryDirectory(prefix='rigmark-regression-') as directory:
+            original = Path(directory) / 'candidate'
+            shutil.copytree(workspace, original)
+            (original / source_name).write_text(tasks.TASKS[task_id]['files'][source_name])
+            regression = runtime.run(original, image, runtime.public_command(task_id), 35)
+        output = regression['output'].lower()
+        checks['regression_fails_on_original'] = (
+            (regression['exit_code'] != 0 or regression['timeout'])
+            and '[build failed]' not in output
+            and not (task_id == 'c-frame-bounds'
+                     and (re.search(r'(?m)^.*:\d+:\d+: error:', output)
+                          or 'undefined reference' in output)))
+        result['regression_control'] = regression
+    if task_id in ('go-worker-pool', 'go-transfer-ledger',
+                   'go-shutdown-deadlock', 'go-export-boundary'):
+        source_name = {'go-worker-pool': 'pool.go',
+                       'go-transfer-ledger': 'transfer.go',
+                       'go-shutdown-deadlock': 'service.go',
+                       'go-export-boundary': 'server.go'}[task_id]
         formatted = subprocess.run(['docker', 'run', '--rm', '--network=none',
             '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges',
             '--user=1000:1000', '-v', f'{workspace.resolve()}:/workspace:ro',
@@ -256,7 +283,9 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
             failure = f'{type(exc).__name__}: {exc}'
             break
     if task_id in ('python-expiry', 'node-idempotency', 'go-worker-pool',
-                   'go-transfer-ledger', 'statement-redact'):
+                   'go-transfer-ledger', 'statement-redact',
+                   'sqlite-migration', 'sqlite-report',
+                   'go-shutdown-deadlock', 'go-export-boundary', 'c-frame-bounds'):
         checks, acceptance = grade_coding(task_id, workspace, image, arkade_root)
     else:
         checks = box.grade(answer)
@@ -308,7 +337,7 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
               'interpretation': 'diagnostic_only',
               'task_status': ('exploratory' if task_id == 'statement-redact'
                               else 'experimental'),
-              'suite_version': '0.8', 'suite_sha256': active_suite_hash,
+              'suite_version': '1.0', 'suite_sha256': active_suite_hash,
               'task_sha256': task_hash,
               'request': {'temperature': 0, 'top_p': 1, 'seed': 20261011,
                           'max_tokens': max_output_tokens, 'max_steps': max_steps,
@@ -332,6 +361,8 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
               'governor_notices': guard.notices,
               'passed': all(checks.values()) and clean_models and failure is None,
               'failure': failure, 'answer': answer,
+              'review_output_format': (advanced_evaluators.review_format(answer)
+                                       if task_id == 'go-concurrency-review' else None),
               'calls': box.calls, 'events': event_log, 'acceptance': acceptance,
               'changes': changes}
     return result
@@ -340,7 +371,9 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
 def selftest(root, arkade_root, image):
     outcomes = {}
     for task_id in ('python-expiry', 'node-idempotency', 'go-worker-pool',
-                    'go-transfer-ledger', 'statement-redact'):
+                    'go-transfer-ledger', 'statement-redact',
+                    'sqlite-migration', 'sqlite-report',
+                    'go-shutdown-deadlock', 'go-export-boundary', 'c-frame-bounds'):
         with tempfile.TemporaryDirectory(prefix='rigmark-control-') as directory:
             parent = Path(directory)
             broken = make_workspace(task_id, parent, arkade_root)
@@ -349,7 +382,8 @@ def selftest(root, arkade_root, image):
             good = make_workspace(task_id, parent / 'good', arkade_root)
             tasks.reference(task_id, good)
             format_result = None
-            if task_id in ('go-worker-pool', 'go-transfer-ledger'):
+            if task_id in ('go-worker-pool', 'go-transfer-ledger',
+                           'go-shutdown-deadlock', 'go-export-boundary'):
                 format_result = tools.ToolBox(task_id, good, image).call('format_go', '{}')
             good_checks, good_result = grade_coding(task_id, good, image, arkade_root)
             if format_result is not None:
@@ -357,6 +391,18 @@ def selftest(root, arkade_root, image):
             outcomes[task_id] = {'broken': broken_checks, 'broken_exit': broken_result['exit_code'],
                                  'reference': good_checks, 'reference_exit': good_result['exit_code'],
                                  'reference_output': good_result['output'][-2000:] if not all(good_checks.values()) else ''}
+    review_calls = [{'name': 'read_file', 'arguments': json.dumps({'path': name})}
+                    for name in ('candidate_a/dispatcher.go', 'candidate_a/worker.go',
+                                 'candidate_b/dispatcher.go', 'candidate_b/worker.go')]
+    outcomes['go-concurrency-review'] = {
+        'broken': advanced_evaluators.grade_review(
+            json.dumps({'findings': [{'file': 'candidate_a/dispatcher.go',
+                                      'kind': 'data_race',
+                                      'evidence': 'A mutex does not protect anything.'}],
+                        'clear': ['candidate_b/dispatcher.go']}), review_calls),
+        'reference': advanced_evaluators.grade_review(
+            json.dumps(advanced_tasks.REVIEW_REFERENCE), review_calls),
+    }
     with tempfile.TemporaryDirectory(prefix='rigmark-native-arkade-control-') as directory:
         parent = Path(directory)
         broken = make_workspace('arkade-add', parent, arkade_root)
