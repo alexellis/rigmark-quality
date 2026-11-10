@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "a9ad27bfac58051df2f8fcfe0d46fa8915afe8e030f406822f4b60438e9b1bd0",
+  "suite_sha256": "945ceaff51b9ed4088e4917074c54e6c0cd06fb472e8fded614b6627b7087242",
   "task_sha256": "05364d05afbf46f3d131b2bc3b82309e406c4c2f87ff72b56c6ba72b00bbd7a6",
   "request": {
     "temperature": 0,
@@ -25,9 +25,9 @@
     "DeepSeek-V4.1-Flash-1017"
   ],
   "model_match": true,
-  "started_at": "2026-11-10T16:38:56.640192+00:00",
-  "finished_at": "2026-11-10T16:39:10.467600+00:00",
-  "elapsed_seconds": 13.8,
+  "started_at": "2026-11-10T19:02:24.932665+00:00",
+  "finished_at": "2026-11-10T19:02:39.043280+00:00",
+  "elapsed_seconds": 14.1,
   "usage": {
     "prompt_tokens": 3233,
     "completion_tokens": 1020,
@@ -59,5 +59,5 @@
   "failure": null,
   "review_output_format": "fenced_json",
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with strengthened hidden acceptance and regression checks. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with hardened hidden acceptance, transaction, boundary, and regression checks. Conversation, tool calls, file diffs, and endpoint details omitted."
 }

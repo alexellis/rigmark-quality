@@ -120,6 +120,30 @@ def python_test_methods(source, module):
             and method.name.startswith('test_')}
 
 
+def test_body(source, name):
+    source = re.sub(r'/\*.*?\*/|//[^\n]*', '', source, flags=re.S)
+    match = re.search(r'\b(?:func\s+)?' + re.escape(name) + r'\s*\([^)]*\)[^{]*\{',
+                      source)
+    if not match:
+        return ''
+    depth = 1
+    for position in range(match.end(), len(source)):
+        if source[position] == '{':
+            depth += 1
+        elif source[position] == '}':
+            depth -= 1
+            if depth == 0:
+                return source[match.end():position]
+    return ''
+
+
+def compact_test(source):
+    # The failure message is not part of a test's assertion. Models often
+    # improve it while retaining the original check and setup.
+    source = re.sub(r'(t\.Fatalf?\(\s*)"(?:\\.|[^"\\])*"', r'\1""', source)
+    return re.sub(r'[\s;]+', '', source)
+
+
 def grade_coding(task_id, workspace, image, arkade_root):
     if task_id == 'statement-redact':
         return grade_statement(workspace, image)
@@ -135,16 +159,44 @@ def grade_coding(task_id, workspace, image, arkade_root):
         if task_id in ('go-shutdown-deadlock', 'go-export-boundary'):
             for test_file in candidate.rglob('*_test.go'):
                 test_file.unlink()
-        for name, content in evaluators.files(task_id, arkade_root).items():
+        marker = None
+        acceptance_files = evaluators.files(task_id, arkade_root)
+        if task_id in ('go-shutdown-deadlock', 'go-export-boundary', 'c-frame-bounds'):
+            marker = '.rigmark-acceptance-' + uuid.uuid4().hex
+            name = ('rigmark_acceptance.c' if task_id == 'c-frame-bounds'
+                    else 'rigmark_acceptance_test.go')
+            content = acceptance_files[name]
+            if task_id == 'c-frame-bounds':
+                content = content.replace('#include <assert.h>',
+                                          '#include <assert.h>\n#include <stdio.h>')
+                content = content.replace('    return 0;\n}',
+                    f'    FILE *finished = fopen("{marker}", "w");\n'
+                    '    assert(finished != NULL);\n'
+                    '    assert(fputs("completed", finished) >= 0);\n'
+                    '    assert(fclose(finished) == 0);\n'
+                    '    return 0;\n}')
+            else:
+                content = content.replace('import (', 'import (\n\t"os"', 1)
+                end = content.rfind('}')
+                content = (content[:end] +
+                    f'\tif err := os.WriteFile("{marker}", []byte("completed"), 0600); '
+                    'err != nil { t.Fatal(err) }\n' + content[end:])
+            acceptance_files[name] = content
+        for name, content in acceptance_files.items():
             target = candidate / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content)
         result = runtime.run(candidate, image, runtime.acceptance_command(task_id),
                              90 if task_id in ('go-worker-pool', 'go-shutdown-deadlock',
                                                 'go-export-boundary') else 45)
+        marker_path = candidate / marker if marker else None
+        marker_written = (marker_path.is_file() and marker_path.stat().st_size == 9
+                          and marker_path.read_bytes() == b'completed') \
+            if marker_path else True
     hidden_ran = (hidden_go_test_passed(result, task_id)
                   if task_id in ('go-shutdown-deadlock', 'go-export-boundary') else True)
-    checks = {'acceptance': result['exit_code'] == 0 and not result['timeout'] and hidden_ran,
+    checks = {'acceptance': result['exit_code'] == 0 and not result['timeout']
+              and hidden_ran and marker_written,
               'public_tests': public['exit_code'] == 0 and not public['timeout']}
     result['public_tests'] = public
     test_name = {'python-expiry': 'test_expiry.py',
@@ -179,6 +231,36 @@ def grade_coding(task_id, workspace, image, arkade_root):
             and not any(marker in regression['output'] for marker in
                         ('SyntaxError', 'ImportError', 'ModuleNotFoundError')))
         result['regression_control'] = regression
+    elif task_id in ('go-shutdown-deadlock', 'go-export-boundary', 'c-frame-bounds'):
+        original_tests = tasks.TASKS[task_id]['files'][test_name]
+        candidate_tests = (workspace / test_name).read_text()
+        if task_id == 'c-frame-bounds':
+            original_body = test_body(original_tests, 'main')
+            candidate_body = test_body(candidate_tests, 'main')
+            original_statements = [compact_test(part) for part in
+                                   original_body.split(';') if compact_test(part)]
+            remaining = compact_test(candidate_body)
+            preserved = bool(original_statements)
+            for statement in original_statements:
+                position = remaining.find(statement)
+                if position < 0:
+                    preserved = False
+                    break
+                remaining = remaining[position + len(statement):]
+            added = candidate_body.count('assert(') > original_body.count('assert(')
+            new_test_names = []
+        else:
+            baseline_name = ('TestProcessesJobs' if task_id == 'go-shutdown-deadlock'
+                             else 'TestOwnerCanRead')
+            original_body = compact_test(test_body(original_tests, baseline_name))
+            candidate_body = compact_test(test_body(candidate_tests, baseline_name))
+            preserved = bool(original_body) and original_body in candidate_body
+            baseline_names = set(re.findall(r'\bfunc\s+(Test\w+)\s*\(', original_tests))
+            candidate_names = set(re.findall(r'\bfunc\s+(Test\w+)\s*\(', candidate_tests))
+            new_test_names = sorted(candidate_names - baseline_names)
+            added = bool(new_test_names)
+        checks['baseline_test_preserved'] = preserved
+        checks['regression_test_added'] = preserved and added
     else:
         checks['regression_test_added'] = (
             len((workspace / test_name).read_text())
@@ -191,7 +273,12 @@ def grade_coding(task_id, workspace, image, arkade_root):
             original = Path(directory) / 'candidate'
             shutil.copytree(workspace, original)
             (original / source_name).write_text(tasks.TASKS[task_id]['files'][source_name])
-            regression = runtime.run(original, image, runtime.public_command(task_id), 35)
+            command = runtime.public_command(task_id)
+            if new_test_names:
+                names = '|'.join(re.escape(name) for name in new_test_names)
+                command = (f'go test -race -count=1 -timeout=30s '
+                           f'-run "^({names})$" .')
+            regression = runtime.run(original, image, command, 35)
         output = regression['output'].lower()
         checks['regression_fails_on_original'] = (
             (regression['exit_code'] != 0 or regression['timeout'])
@@ -456,6 +543,42 @@ def selftest(root, arkade_root, image):
                     'reference': {'hidden_acceptance': good_checks['acceptance'],
                                   'public_bypass': bypass_checks['public_tests']},
                     'broken': {'hidden_acceptance': bypass_checks['acceptance']}}
+                forged = parent / 'forged'
+                shutil.copytree(good, forged)
+                source_name = ('service.go' if task_id == 'go-shutdown-deadlock'
+                               else 'server.go')
+                named_test = ('TestRigmarkAcceptanceShutdown' if task_id == 'go-shutdown-deadlock'
+                              else 'TestRigmarkAcceptanceTenantBoundary')
+                source = forged / source_name
+                contents = source.read_text()
+                if task_id == 'go-shutdown-deadlock':
+                    contents = contents.replace('import "sync"',
+                                                'import ("sync"; "fmt"; "os")', 1)
+                else:
+                    contents = contents.replace('import (',
+                                                'import (\n"fmt"\n"os"', 1)
+                contents += (f'\nfunc init() {{ fmt.Println("=== RUN   {named_test}"); '
+                             f'fmt.Println("--- PASS: {named_test} (0.00s)"); '
+                             'os.Exit(0) }\n')
+                source.write_text(contents)
+                forged_checks, forged_result = grade_coding(task_id, forged, image, arkade_root)
+                outcomes[task_id + '-forged-pass'] = {
+                    'reference': {'hidden_acceptance': good_checks['acceptance'],
+                                  'public_bypass': forged_checks['public_tests']},
+                    'broken': {'hidden_acceptance': forged_checks['acceptance'],
+                               'forged_go_event': hidden_go_test_passed(forged_result, task_id)}}
+                removed = parent / 'removed-test'
+                shutil.copytree(good, removed)
+                test_file = removed / ('service_test.go' if task_id == 'go-shutdown-deadlock'
+                                       else 'server_test.go')
+                baseline_name = ('TestProcessesJobs' if task_id == 'go-shutdown-deadlock'
+                                 else 'TestOwnerCanRead')
+                test_file.write_text(test_file.read_text().replace(
+                    'func ' + baseline_name, 'func TestRemoved' + baseline_name))
+                removed_checks, _ = grade_coding(task_id, removed, image, arkade_root)
+                outcomes[task_id + '-removed-test'] = {
+                    'reference': {'baseline_preserved': good_checks['baseline_test_preserved']},
+                    'broken': {'baseline_preserved': removed_checks['baseline_test_preserved']}}
             if task_id in ('sqlite-migration', 'sqlite-report'):
                 test_file = broken / ('test_migration.py' if task_id == 'sqlite-migration'
                                       else 'test_report.py')
@@ -466,6 +589,27 @@ def selftest(root, arkade_root, image):
                     'reference': {'new_test': good_checks['regression_test_added'],
                                   'fails_old': good_checks['regression_fails_on_original']},
                     'broken': {'comment_only': comment_checks['regression_test_added']}}
+            if task_id == 'sqlite-migration':
+                rollback = parent / 'rollback-entry'
+                shutil.copytree(good, rollback)
+                source = rollback / 'migration.py'
+                source.write_text(source.read_text().replace(
+                    'def migrate(conn):\n', 'def migrate(conn):\n    conn.rollback()\n', 1))
+                rollback_checks, _ = grade_coding(task_id, rollback, image, arkade_root)
+                outcomes['sqlite-migration-rollback-entry'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': rollback_checks['acceptance']}}
+                rerun = parent / 'destructive-rerun'
+                shutil.copytree(good, rerun)
+                source = rerun / 'migration.py'
+                source.write_text(source.read_text().replace(
+                    'if {"invoices", "invoice_items"} <= tables:\n            return',
+                    'if {"invoices", "invoice_items"} <= tables:\n'
+                    '            conn.execute("DROP TABLE audit_log")\n            return'))
+                rerun_checks, _ = grade_coding(task_id, rerun, image, arkade_root)
+                outcomes['sqlite-migration-destructive-rerun'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': rerun_checks['acceptance']}}
             if task_id == 'c-frame-bounds':
                 source = good / 'frame.c'
                 source.write_text(source.read_text().replace('payload_len >= out_cap',
@@ -474,7 +618,36 @@ def selftest(root, arkade_root, image):
                 outcomes['c-frame-exact-cap'] = {
                     'reference': {'acceptance': good_checks['acceptance']},
                     'broken': {'acceptance': boundary_checks['acceptance']}}
+                exiting = parent / 'constructor-exit'
+                shutil.copytree(good, exiting)
+                source = exiting / 'frame.c'
+                source.write_text('#include <stdlib.h>\n'
+                                  '__attribute__((constructor)) static void exit_early(void) '
+                                  '{ exit(0); }\n' + source.read_text())
+                exit_checks, _ = grade_coding(task_id, exiting, image, arkade_root)
+                outcomes['c-frame-constructor-exit'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_bypass': exit_checks['public_tests']},
+                    'broken': {'acceptance': exit_checks['acceptance']}}
             if task_id == 'sqlite-report':
+                partial = parent / 'partial-index'
+                shutil.copytree(good, partial)
+                (partial / 'indexes.sql').write_text(
+                    "CREATE INDEX orders_paid_date ON orders(ordered_on, customer_id) "
+                    "WHERE status = 'paid';\n"
+                    'CREATE INDEX order_lines_order_id ON order_lines(order_id);\n')
+                partial_checks, _ = grade_coding(task_id, partial, image, arkade_root)
+                invalid_partial = parent / 'invalid-partial-index'
+                shutil.copytree(good, invalid_partial)
+                (invalid_partial / 'indexes.sql').write_text(
+                    "CREATE INDEX orders_pending_date ON orders(ordered_on, customer_id) "
+                    "WHERE status = 'pending';\n"
+                    'CREATE INDEX order_lines_order_id ON order_lines(order_id);\n')
+                invalid_partial_checks, _ = grade_coding(
+                    task_id, invalid_partial, image, arkade_root)
+                outcomes['sqlite-report-partial-index'] = {
+                    'reference': {'valid_partial_index': partial_checks['acceptance']},
+                    'broken': {'invalid_partial_index': invalid_partial_checks['acceptance']}}
                 (good / 'indexes.sql').write_text(
                     'CREATE INDEX orders_date_status ON orders(ordered_on, status);\n'
                     'CREATE INDEX order_lines_order_id ON order_lines(order_id);\n')
@@ -482,6 +655,14 @@ def selftest(root, arkade_root, image):
                 outcomes['sqlite-report-weak-index'] = {
                     'reference': {'valid_index': good_checks['acceptance']},
                     'broken': {'weak_index': weak_checks['acceptance']}}
+                exclusive = parent / 'exclusive-date'
+                shutil.copytree(good, exclusive)
+                query = exclusive / 'report.sql'
+                query.write_text(query.read_text().replace('>= :since', '> :since'))
+                exclusive_checks, _ = grade_coding(task_id, exclusive, image, arkade_root)
+                outcomes['sqlite-report-exclusive-date'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': exclusive_checks['acceptance']}}
     with tempfile.TemporaryDirectory(prefix='rigmark-review-control-') as directory:
         review_workspace = make_workspace('go-concurrency-review', Path(directory), arkade_root)
         review_box = tools.ToolBox('go-concurrency-review', review_workspace, image)

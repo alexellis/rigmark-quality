@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "a9ad27bfac58051df2f8fcfe0d46fa8915afe8e030f406822f4b60438e9b1bd0",
+  "suite_sha256": "945ceaff51b9ed4088e4917074c54e6c0cd06fb472e8fded614b6627b7087242",
   "task_sha256": "05364d05afbf46f3d131b2bc3b82309e406c4c2f87ff72b56c6ba72b00bbd7a6",
   "request": {
     "temperature": 0,
@@ -28,8 +28,8 @@
     "Qwen3.8-27B-FP8-vllm"
   ],
   "model_match": true,
-  "started_at": "2026-11-10T16:40:09.246646+00:00",
-  "finished_at": "2026-11-10T16:41:10.609796+00:00",
+  "started_at": "2026-11-10T19:03:13.774128+00:00",
+  "finished_at": "2026-11-10T19:04:15.201442+00:00",
   "elapsed_seconds": 61.4,
   "usage": {
     "prompt_tokens": 10077,
@@ -62,5 +62,5 @@
   "failure": null,
   "review_output_format": "fenced_json",
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with strengthened hidden acceptance and regression checks. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with hardened hidden acceptance, transaction, boundary, and regression checks. Conversation, tool calls, file diffs, and endpoint details omitted."
 }

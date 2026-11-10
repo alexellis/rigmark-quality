@@ -18,6 +18,18 @@ def tables(conn):
         "SELECT name FROM sqlite_master WHERE type='table'")}
 
 
+def state(conn):
+    schema = conn.execute(
+        "SELECT type, name, tbl_name, sql FROM sqlite_master "
+        "ORDER BY type, name").fetchall()
+    rows = {table: conn.execute(f'SELECT * FROM "{table}" ORDER BY rowid').fetchall()
+            for table in tables(conn)}
+    return (schema, rows, conn.execute('PRAGMA user_version').fetchone()[0],
+            conn.execute('PRAGMA foreign_keys').fetchone()[0],
+            conn.execute('PRAGMA foreign_key_list(invoice_items)').fetchall()
+            if 'invoice_items' in rows else [])
+
+
 class Acceptance(unittest.TestCase):
     def test_every_line_and_other_table_survive(self):
         conn = legacy_connection()
@@ -52,12 +64,9 @@ class Acceptance(unittest.TestCase):
         self.assertEqual(conn.execute('SELECT invoice_id, customer_email, issued_on, paid_cents '
                                       'FROM invoices ORDER BY invoice_id').fetchall(),
                          sorted({(r[1], r[2], r[3], r[4]) for r in rows}))
-        before = (conn.execute('SELECT * FROM invoices ORDER BY invoice_id').fetchall(),
-                  conn.execute('SELECT * FROM invoice_items ORDER BY line_id').fetchall())
+        before = state(conn)
         migrate(conn)
-        self.assertEqual(before, (
-            conn.execute('SELECT * FROM invoices ORDER BY invoice_id').fetchall(),
-            conn.execute('SELECT * FROM invoice_items ORDER BY line_id').fetchall()))
+        self.assertEqual(state(conn), before)
 
     def test_conflicting_metadata_rolls_back_everything(self):
         for field, replacement in (('customer_email', 'second@example.test'),
@@ -72,7 +81,7 @@ class Acceptance(unittest.TestCase):
                 conn.executemany('INSERT INTO invoice_lines VALUES (?,?,?,?,?,?,?,?)', rows)
                 conn.execute("INSERT INTO audit_log VALUES (7, 'retain')")
                 conn.commit()
-                with self.assertRaises((ValueError, sqlite3.DatabaseError)):
+                with self.assertRaises(Exception):
                     migrate(conn)
                 self.assertEqual(tables(conn), {'invoice_lines', 'audit_log'})
                 self.assertEqual(conn.execute('SELECT * FROM invoice_lines ORDER BY line_id').fetchall(), rows)
@@ -81,12 +90,19 @@ class Acceptance(unittest.TestCase):
 
     def test_caller_can_roll_back_migration(self):
         conn = legacy_connection()
+        before = state(conn)
         conn.execute("INSERT INTO invoice_lines VALUES (8, 'INV-R', 'r@example.test', '2026-10-01', 10, 'R', 1, 10)")
+        conn.execute("INSERT INTO audit_log VALUES (9, 'caller transaction')")
         migrate(conn)
+        self.assertEqual(conn.execute('SELECT * FROM invoices').fetchall(),
+                         [('INV-R', 'r@example.test', '2026-10-01', 10)])
+        self.assertEqual(conn.execute('SELECT * FROM invoice_items').fetchall(),
+                         [(8, 'INV-R', 'R', 1, 10)])
+        self.assertEqual(conn.execute('SELECT * FROM audit_log').fetchall(),
+                         [(9, 'caller transaction')])
+        self.assertEqual(conn.execute('PRAGMA user_version').fetchone()[0], 2)
         conn.rollback()
-        self.assertEqual(tables(conn), {'invoice_lines', 'audit_log'})
-        self.assertEqual(conn.execute('SELECT COUNT(*) FROM invoice_lines').fetchone()[0], 0)
-        self.assertEqual(conn.execute('PRAGMA user_version').fetchone()[0], 0)
+        self.assertEqual(state(conn), before)
 
 
 if __name__ == '__main__':

@@ -151,9 +151,15 @@ def review_format(answer):
         return 'other'
 
 
+def review_kind(kind):
+    words = set(re.findall(r'[a-z]+', kind.casefold()))
+    return ('channel' in words and
+            bool(words & {'close', 'closed', 'closing'}) and
+            bool(words & {'send', 'race', 'panic'}))
+
+
 def review_cause(kind, evidence):
-    if not re.search(r'\bsend[\s_-]+on[\s_-]+closed[\s_-]+channel\b',
-                     kind.casefold()):
+    if not review_kind(kind):
         return False
     text = evidence.casefold()
     if (re.search(r'\b(?:does\s+not|doesn.t|cannot|never|no)\s+'
@@ -168,8 +174,9 @@ def review_cause(kind, evidence):
     position = 0
     for pattern in (
             r'\bsubmit\b',
-            r'\b(?:reads?|observes?|checks?|sees?|loads?)\s+'
-            r'(?:d\.)?(?:wasclosed|closed)\s*(?:==|=)\s*false\b',
+            r'\b(?:reads?|observes?|checks?|sees?|loads?|finds?)\s+'
+            r'(?:the\s+)?(?:(?:d\.)?(?:wasclosed|closed)\s*(?:==|=)\s*false'
+            r'|(?:dispatcher\s+)?open)\b',
             r'\bclose\b',
             r'\bcloses?\s*\(?\s*(?:d\.)?jobs\b',
             r'(?:\b(?:d\.)?jobs\s*<-\s*job\b|\bsends?\b)',
@@ -224,8 +231,7 @@ def grade_review(answer, calls):
     return {
         'json_contract': well_formed and one_finding,
         'real_issue': finding.get('file') == 'candidate_b/dispatcher.go'
-                      and bool(re.search(r'\bsend[\s_-]+on[\s_-]+closed[\s_-]+channel\b',
-                                         finding.get('kind', '').casefold())),
+                      and review_kind(finding.get('kind', '')),
         'no_false_positive': clear == ['candidate_a/dispatcher.go'],
         'causal_evidence': len(evidence) >= 55
                            and review_cause(finding.get('kind', ''), evidence),

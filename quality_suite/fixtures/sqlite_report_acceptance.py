@@ -22,6 +22,12 @@ class Acceptance(unittest.TestCase):
     def check_case(self, customers, orders, salt, since):
         conn = sqlite3.connect(':memory:')
         seed(conn, customers, orders, salt)
+        # A paid order on the boundary must be included. Its amount changes
+        # the top result, so an exclusive date filter cannot pass by chance.
+        conn.execute('INSERT INTO orders VALUES (?, ?, ?, ?)',
+                     (orders + 1, 1, 'paid', since))
+        conn.execute('INSERT INTO order_lines VALUES (?, ?, ?, ?, ?)',
+                     (2 * orders + 1, orders + 1, 'BOUNDARY', 1, 1000000000))
         before = {table: conn.execute(f'SELECT * FROM {table} ORDER BY id').fetchall()
                   for table in ('customers', 'orders', 'order_lines')}
         want = expected(conn, since)
@@ -43,17 +49,25 @@ class Acceptance(unittest.TestCase):
             if match:
                 lookups.append((match.group(1), match.group(2)))
         plan = '\n'.join(plan_rows)
-        required = {
-            'orders': (r'\bstatus\s*=\s*\?', r'\bordered_on\s*>=?\s*\?'),
-            'order_lines': (r'\border_id\s*=\s*\?',),
-        }
-        for table, constraints in required.items():
-            indexes = {row[1] for row in conn.execute(f'PRAGMA index_list({table})')}
-            self.assertTrue(indexes, table + ' lacks an index')
-            self.assertTrue(any(name in indexes and all(re.search(pattern, terms)
-                                                        for pattern in constraints)
-                                for name, terms in lookups),
-                            table + ' has no indexed lookup on required columns:\n' + plan)
+        indexes = {row[1] for row in conn.execute('PRAGMA index_list(orders)')}
+        definitions = dict(conn.execute(
+            "SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='orders'"))
+        # SQLite renders both >= and > as >? in EXPLAIN QUERY PLAN. The
+        # boundary result above distinguishes their semantics. A partial
+        # index WHERE status='paid' supplies the status filter without a
+        # status=? term in the plan.
+        ordered_on = r'\bordered_on\s*>\s*\?'
+        paid_predicate = r"\bWHERE\s+status\s*=\s*['\"]paid['\"]"
+        self.assertTrue(any(
+            name in indexes and re.search(ordered_on, terms)
+            and (re.search(r'\bstatus\s*=\s*\?', terms)
+                 or re.search(paid_predicate, definitions.get(name) or '', re.I))
+            for name, terms in lookups),
+            'orders has no indexed lookup on paid status and date:\n' + plan)
+        line_indexes = {row[1] for row in conn.execute('PRAGMA index_list(order_lines)')}
+        self.assertTrue(any(name in line_indexes and re.search(r'\border_id\s*=\s*\?', terms)
+                            for name, terms in lookups),
+                        'order_lines has no indexed order_id lookup:\n' + plan)
 
     def test_large_repetitive_seed(self):
         self.check_case(317, 50000, 17, '2026-10-01')

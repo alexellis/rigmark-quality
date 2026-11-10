@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "a9ad27bfac58051df2f8fcfe0d46fa8915afe8e030f406822f4b60438e9b1bd0",
+  "suite_sha256": "945ceaff51b9ed4088e4917074c54e6c0cd06fb472e8fded614b6627b7087242",
   "task_sha256": "3f60d44163c9520566ca0dd02167ceeacb4796650940f61181e2804d9708101f",
   "request": {
     "temperature": 0,
@@ -25,30 +25,32 @@
     "nvidia/GLM-5.3-Flash-NVFP4",
     "nvidia/GLM-5.3-Flash-NVFP4",
     "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
     "nvidia/GLM-5.3-Flash-NVFP4"
   ],
   "model_match": true,
-  "started_at": "2026-11-10T16:36:15.974639+00:00",
-  "finished_at": "2026-11-10T16:36:28.400399+00:00",
-  "elapsed_seconds": 12.4,
+  "started_at": "2026-11-10T18:59:22.187441+00:00",
+  "finished_at": "2026-11-10T18:59:39.816145+00:00",
+  "elapsed_seconds": 17.6,
   "usage": {
-    "prompt_tokens": 10806,
-    "completion_tokens": 759,
-    "reasoning_tokens": 0
+    "prompt_tokens": 17692,
+    "completion_tokens": 1073,
+    "reasoning_tokens": 27
   },
   "reasoning_diagnostics": {
-    "characters": 5,
+    "characters": 120,
     "repeated_trigram_fraction": 0.0,
     "loop_detected": false
   },
   "tool_diagnostics": {
-    "parsed_calls": 9,
+    "parsed_calls": 11,
     "invalid_calls": 0,
     "no_call_or_answer": false,
     "unfinished_after_tool": false,
     "unparsed_tool_markup": false
   },
-  "steps": 6,
+  "steps": 8,
   "checks": {
     "acceptance": true,
     "public_tests": true,
@@ -61,5 +63,5 @@
   "failure": null,
   "review_output_format": null,
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with strengthened hidden acceptance and regression checks. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with hardened hidden acceptance, transaction, boundary, and regression checks. Conversation, tool calls, file diffs, and endpoint details omitted."
 }

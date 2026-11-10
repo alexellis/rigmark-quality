@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from . import advanced_evaluators, advanced_tasks
+from . import advanced_evaluators, advanced_tasks, cli, tasks
 from .tools import ToolBox
 
 
@@ -24,6 +24,20 @@ class FileSearchTests(unittest.TestCase):
                              {'matches': ['candidate.go:1: Name:       "yq"']})
             self.assertEqual(box.call('list_files', '{}'),
                              {'files': ['candidate.go']})
+
+
+class BaselineTestTests(unittest.TestCase):
+    def test_go_assertion_message_can_improve(self):
+        original = tasks.TASKS['go-export-boundary']['files']['server_test.go']
+        candidate = original.replace('status %d', 'status %d, want 200')
+        baseline = cli.compact_test(cli.test_body(original, 'TestOwnerCanRead'))
+        changed = cli.compact_test(cli.test_body(candidate, 'TestOwnerCanRead'))
+        self.assertIn(baseline, changed)
+        without_assertion = candidate.replace(
+            'if w.Code != http.StatusOK { t.Fatalf("status %d, want 200", w.Code) }',
+            '')
+        changed = cli.compact_test(cli.test_body(without_assertion, 'TestOwnerCanRead'))
+        self.assertNotIn(baseline, changed)
 
 
 class ReviewGradeTests(unittest.TestCase):
@@ -102,6 +116,13 @@ class ReviewGradeTests(unittest.TestCase):
                     'panics with send on closed channel.')
         self.assertTrue(advanced_evaluators.review_cause(
             'send_on_closed_channel', evidence))
+
+    def test_causal_review_accepts_channel_close_race(self):
+        evidence = ('Submit observes the dispatcher open, then unlocks. '
+                    'Close closes jobs; Submit sends to the closed channel '
+                    'and panics.')
+        self.assertTrue(advanced_evaluators.review_cause(
+            'channel-close race', evidence))
 
     def test_false_positive_fails(self):
         with tempfile.TemporaryDirectory() as directory:
