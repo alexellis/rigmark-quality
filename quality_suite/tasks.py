@@ -3,6 +3,8 @@ from pathlib import Path
 import hashlib
 import shutil
 
+from . import advanced_tasks, database_tasks
+
 ARKADE_REVISION = "e5215097ce8d9340af060412663f7c7130c594dd"
 ARKADE_TOOLS_SHA256 = "3572cb02d77fa8c299821d41d2c6aa1b8228797e3296cffbee4e4d78ce60909a"
 
@@ -296,6 +298,8 @@ func TestTransferOne(t *testing.T) {
         "prompt": "Add shfmt from mvdan/sh to arkade get. Follow AGENTS.md. Work in this checkout; do not commit or open a PR.",
         "files": {},
     },
+    **database_tasks.TASK_DEFINITIONS,
+    **advanced_tasks.TASK_DEFINITIONS,
     "statement-redact": {
         "category": "document", "editable": ["redact_statement.py"],
         "prompt": "Redact the names of human senders on incoming bank transfers in bank_statement.pdf. Preserve every date, signed amount, running balance, row order, outgoing recipient name, organisation name, and other description text. Output must be a PDF with no recoverable sender names in its text layer or visible page. bank_statement.txt is a faithful text extraction for inspection. The offline test image has the Python reportlab package and the pdftotext command available; you may use them to rebuild the PDF from retained data. Implement redact_pdf(input_path, output_path) in redact_statement.py and keep its CLI. Only edit redact_statement.py. The supplied public test uses this one fictional statement; the independent judge uses fresh statements with other names and amounts. Rebuilding the PDF is allowed if the retained transaction data stays intact. run_tests exercises the public example; do not claim success without using it.",
@@ -376,7 +380,9 @@ def prepare(task_id, destination, arkade_root=None):
             raise ValueError(f"arkade tools.go does not match pinned revision {ARKADE_REVISION}")
         shutil.copytree(arkade_root, destination, dirs_exist_ok=True, ignore=shutil.ignore_patterns(".git"))
     for name, content in TASKS[task_id]["files"].items():
-        (destination / name).write_text(content)
+        target = destination / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content)
     if task_id == 'statement-redact':
         source = Path(__file__).parent / 'fixtures'
         shutil.copyfile(source / 'synthetic-bank-statement.pdf',
@@ -386,6 +392,12 @@ def prepare(task_id, destination, arkade_root=None):
 
 
 def reference(task_id, workspace):
+    if task_id in advanced_tasks.TASK_DEFINITIONS:
+        advanced_tasks.reference(task_id, workspace)
+        return
+    if task_id in database_tasks.TASK_DEFINITIONS:
+        database_tasks.reference(task_id, workspace)
+        return
     if task_id == "python-expiry":
         (workspace / "expiry.py").write_text(PYTHON_GOOD)
         with (workspace / "test_expiry.py").open('a') as f:

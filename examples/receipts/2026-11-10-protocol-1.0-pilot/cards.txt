@@ -1,0 +1,87 @@
+╭────────────────────────────────────────────────────────────────────────────╮
+│                                                                            │
+│  R I G M A R K   //   QUALITY TASK RECEIPT                                 │
+│  EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE               │
+│                                                                            │
+├─ MODEL ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  DeepSeek-V4.1-Flash-1017                                                  │
+│                                                                            │
+├─ TASKS ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  TASK                        ARTEFACT  FINISHED  TIME     STOP             │
+│  sqlite-migration            yes       yes         49.2s normal            │
+│  sqlite-report               yes       yes         34.5s normal            │
+│  go-shutdown-deadlock        yes       yes         74.2s normal            │
+│  go-concurrency-review       yes       yes         14.3s normal            │
+│  go-export-boundary          yes       yes         81.7s normal            │
+│  c-frame-bounds              yes       yes         23.6s normal            │
+│                                                                            │
+│  Artefact and conversation completion are separate outcomes.               │
+│  Read the JSON summary for checks and stop state.                          │
+│                                                                            │
+├─ RUN ──────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  Tasks 6  ·  Suite 1.0  ·  SHA256 9f5e7a340d348b60…                        │
+│  Reasoning low  ·  Thinking default  ·  Output cap 32768                   │
+│  Turn cap none  ·  Time cap 1800s                                          │
+│                                                                            │
+╰────────────────────────────────────────────────────────────────────────────╯
+╭────────────────────────────────────────────────────────────────────────────╮
+│                                                                            │
+│  R I G M A R K   //   QUALITY TASK RECEIPT                                 │
+│  EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE               │
+│                                                                            │
+├─ MODEL ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  Qwen3.8-27B-FP8-vllm                                                      │
+│                                                                            │
+├─ TASKS ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  TASK                        ARTEFACT  FINISHED  TIME     STOP             │
+│  sqlite-migration            yes       yes        108.8s normal            │
+│  sqlite-report               yes       yes         31.6s normal            │
+│  go-shutdown-deadlock        yes       yes        124.9s normal            │
+│  go-concurrency-review       yes       yes         61.5s normal            │
+│  go-export-boundary          yes       yes         61.9s normal            │
+│  c-frame-bounds              yes       yes         14.2s normal            │
+│                                                                            │
+│  Artefact and conversation completion are separate outcomes.               │
+│  Read the JSON summary for checks and stop state.                          │
+│                                                                            │
+├─ RUN ──────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  Tasks 6  ·  Suite 1.0  ·  SHA256 9f5e7a340d348b60…                        │
+│  Reasoning low  ·  Thinking default  ·  Output cap 32768                   │
+│  Turn cap none  ·  Time cap 1800s                                          │
+│                                                                            │
+╰────────────────────────────────────────────────────────────────────────────╯
+╭────────────────────────────────────────────────────────────────────────────╮
+│                                                                            │
+│  R I G M A R K   //   QUALITY TASK RECEIPT                                 │
+│  EXPERIMENTAL · TASK DIAGNOSTICS, NOT A MODEL OR QUANT SCORE               │
+│                                                                            │
+├─ MODEL ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  glm-5.3-flash                                                             │
+│                                                                            │
+├─ TASKS ────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  TASK                        ARTEFACT  FINISHED  TIME     STOP             │
+│  sqlite-migration            yes       yes         35.6s normal            │
+│  sqlite-report               yes       yes         15.2s normal            │
+│  go-shutdown-deadlock        yes       yes         73.3s normal            │
+│  go-concurrency-review       yes       yes         12.7s normal            │
+│  go-export-boundary          yes       yes         80.0s normal            │
+│  c-frame-bounds              yes       yes         11.8s normal            │
+│                                                                            │
+│  Artefact and conversation completion are separate outcomes.               │
+│  Read the JSON summary for checks and stop state.                          │
+│                                                                            │
+├─ RUN ──────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  Tasks 6  ·  Suite 1.0  ·  SHA256 9f5e7a340d348b60…                        │
+│  Reasoning low  ·  Thinking default  ·  Output cap 32768                   │
+│  Turn cap none  ·  Time cap 1800s                                          │
+│                                                                            │
+╰────────────────────────────────────────────────────────────────────────────╯

@@ -22,7 +22,7 @@
 │  security-boundary           yes       yes          2.4s normal            │
 │                                                                            │
 │  Artefact and conversation completion are separate outcomes.               │
-│  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│  Read the JSON summary for checks and stop state.                          │
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
@@ -47,7 +47,7 @@
 │  arkade-add                  no        no          71.4s tool step budget… │
 │                                                                            │
 │  Artefact and conversation completion are separate outcomes.               │
-│  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│  Read the JSON summary for checks and stop state.                          │
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
@@ -80,7 +80,7 @@
 │  security-boundary           yes       yes         11.7s normal            │
 │                                                                            │
 │  Artefact and conversation completion are separate outcomes.               │
-│  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│  Read the JSON summary for checks and stop state.                          │
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
@@ -105,7 +105,7 @@
 │  arkade-add                  yes       no         602.8s tool step budget… │
 │                                                                            │
 │  Artefact and conversation completion are separate outcomes.               │
-│  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│  Read the JSON summary for checks and stop state.                          │
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
@@ -138,7 +138,7 @@
 │  security-boundary           no        no          55.0s model exhausted…  │
 │                                                                            │
 │  Artefact and conversation completion are separate outcomes.               │
-│  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│  Read the JSON summary for checks and stop state.                          │
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
@@ -163,7 +163,7 @@
 │  arkade-add                  no        no         151.0s tool step budget… │
 │                                                                            │
 │  Artefact and conversation completion are separate outcomes.               │
-│  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│  Read the JSON summary for checks and stop state.                          │
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │

@@ -1,0 +1,79 @@
+{
+  "task": "go-concurrency-review",
+  "category": "review",
+  "interpretation": "diagnostic_only",
+  "task_status": "experimental",
+  "suite_version": "1.0",
+  "suite_sha256": "9f5e7a340d348b60c070fbb0ca6d10dc1b967bb477a519a7341df59bfac754b1",
+  "task_sha256": "05364d05afbf46f3d131b2bc3b82309e406c4c2f87ff72b56c6ba72b00bbd7a6",
+  "request": {
+    "temperature": 0,
+    "top_p": 1,
+    "seed": 20261011,
+    "max_tokens": 32768,
+    "max_steps": 0,
+    "task_seconds": 1800,
+    "reasoning_effort": "low",
+    "thinking": "default"
+  },
+  "arkade_revision": null,
+  "runtime_image_id": "sha256:0a98fd299a801e51eec00b533e28b2aa986c59a200bda85ff794a5182096d031",
+  "requested_model": "DeepSeek-V4.1-Flash-1017",
+  "observed_models": [
+    "DeepSeek-V4.1-Flash-1017",
+    "DeepSeek-V4.1-Flash-1017",
+    "DeepSeek-V4.1-Flash-1017"
+  ],
+  "model_match": true,
+  "started_at": "2026-11-10T19:53:12.746313+00:00",
+  "finished_at": "2026-11-10T19:53:27.091963+00:00",
+  "elapsed_seconds": 14.3,
+  "usage": {
+    "prompt_tokens": 3233,
+    "completion_tokens": 1020,
+    "reasoning_tokens": 465
+  },
+  "reasoning_diagnostics": {
+    "characters": 2015,
+    "repeated_trigram_fraction": 0.058,
+    "loop_detected": false
+  },
+  "tool_diagnostics": {
+    "parsed_calls": 5,
+    "invalid_calls": 0,
+    "no_call_or_answer": false,
+    "unfinished_after_tool": false,
+    "unparsed_tool_markup": false
+  },
+  "steps": 3,
+  "checks": {
+    "json_contract": true,
+    "real_issue": true,
+    "no_false_positive": true,
+    "causal_evidence": true,
+    "inspected_both": true
+  },
+  "artefact_passed": true,
+  "conversation_finished": true,
+  "passed": true,
+  "failure": null,
+  "review_output_format": "fenced_json",
+  "regrade": {
+    "method": "offline_hidden_judge",
+    "source_suite_sha256": "f6134f4f8fe127c96f87167c932535a5fef69632be56d441e6986d518bc58059",
+    "regraded_at": "2026-11-10T21:30:57.415663+00:00",
+    "model_inference_repeated": false
+  },
+  "receipt_kind": "public_summary",
+  "source_note": "Model inference on 10 November 2026; recorded final workspaces were rebuilt from hashed diffs and regraded offline with revised hidden checks. No new model inference was made for this judge revision. Conversation, tool calls, file diffs, and endpoint details omitted.",
+  "harness": "typed-tools-v1",
+  "serving": {
+    "gateway": "direct",
+    "engine": "TensorFold",
+    "engine_version": null,
+    "checkpoint": "DeepSeek-V4.1-Flash-1017",
+    "quantisation": "EXL3 2.9 bpw",
+    "hardware": "2 DGX Sparks"
+  },
+  "stop_reason": "normal"
+}

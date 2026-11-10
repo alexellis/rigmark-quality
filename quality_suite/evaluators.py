@@ -1,4 +1,6 @@
 """Acceptance checks injected only after the agent finishes."""
+from pathlib import Path
+from . import advanced_evaluators
 PYTHON_TEST = '''import unittest, copy, random
 from expiry import expired_keys
 class Acceptance(unittest.TestCase):
@@ -184,6 +186,11 @@ func TestRigmarkAcceptance(t *testing.T) {
 
 
 def files(task_id, original=None):
+    if task_id in ('go-shutdown-deadlock', 'go-export-boundary', 'c-frame-bounds'):
+        return advanced_evaluators.files(task_id)
+    if task_id in ('sqlite-migration', 'sqlite-report'):
+        name = task_id.replace('-', '_') + '_acceptance.py'
+        return {name: (Path(__file__).parent / 'fixtures' / name).read_text()}
     if task_id == 'python-expiry':
         return {'rigmark_acceptance.py': PYTHON_TEST}
     if task_id == 'node-idempotency':

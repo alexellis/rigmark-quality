@@ -1,0 +1,80 @@
+{
+  "task": "sqlite-migration",
+  "category": "database",
+  "interpretation": "diagnostic_only",
+  "task_status": "experimental",
+  "suite_version": "1.0",
+  "suite_sha256": "9f5e7a340d348b60c070fbb0ca6d10dc1b967bb477a519a7341df59bfac754b1",
+  "task_sha256": "9bf83219fb456e02b517e2c6b5c02fe40834d8953107bd50857371756ebf13ae",
+  "request": {
+    "temperature": 0,
+    "top_p": 1,
+    "seed": 20261011,
+    "max_tokens": 32768,
+    "max_steps": 0,
+    "task_seconds": 1800,
+    "reasoning_effort": "low",
+    "thinking": "default"
+  },
+  "arkade_revision": null,
+  "runtime_image_id": "sha256:0a98fd299a801e51eec00b533e28b2aa986c59a200bda85ff794a5182096d031",
+  "requested_model": "Qwen3.8-27B-FP8-vllm",
+  "observed_models": [
+    "Qwen3.8-27B-FP8-vllm",
+    "Qwen3.8-27B-FP8-vllm",
+    "Qwen3.8-27B-FP8-vllm",
+    "Qwen3.8-27B-FP8-vllm",
+    "Qwen3.8-27B-FP8-vllm"
+  ],
+  "model_match": true,
+  "started_at": "2026-11-10T19:51:54.706079+00:00",
+  "finished_at": "2026-11-10T19:53:43.472208+00:00",
+  "elapsed_seconds": 108.8,
+  "usage": {
+    "prompt_tokens": 13725,
+    "completion_tokens": 13221,
+    "reasoning_tokens": 0
+  },
+  "reasoning_diagnostics": {
+    "characters": 37875,
+    "repeated_trigram_fraction": 0.421,
+    "loop_detected": false
+  },
+  "tool_diagnostics": {
+    "parsed_calls": 7,
+    "invalid_calls": 0,
+    "no_call_or_answer": false,
+    "unfinished_after_tool": false,
+    "unparsed_tool_markup": false
+  },
+  "steps": 5,
+  "checks": {
+    "acceptance": true,
+    "public_tests": true,
+    "regression_test_added": true,
+    "regression_fails_on_original": true
+  },
+  "artefact_passed": true,
+  "conversation_finished": true,
+  "passed": true,
+  "failure": null,
+  "review_output_format": null,
+  "regrade": {
+    "method": "offline_hidden_judge",
+    "source_suite_sha256": "f6134f4f8fe127c96f87167c932535a5fef69632be56d441e6986d518bc58059",
+    "regraded_at": "2026-11-10T21:33:43.853727+00:00",
+    "model_inference_repeated": false
+  },
+  "receipt_kind": "public_summary",
+  "source_note": "Model inference on 10 November 2026; recorded final workspaces were rebuilt from hashed diffs and regraded offline with revised hidden checks. No new model inference was made for this judge revision. Conversation, tool calls, file diffs, and endpoint details omitted.",
+  "harness": "typed-tools-v1",
+  "serving": {
+    "gateway": "Toilgate",
+    "engine": "vLLM",
+    "engine_version": null,
+    "checkpoint": "Qwen3.8-27B-FP8",
+    "quantisation": "FP8",
+    "hardware": "RTX PRO 6000 Blackwell"
+  },
+  "stop_reason": "normal"
+}

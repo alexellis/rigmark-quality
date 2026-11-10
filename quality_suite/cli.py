@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 from datetime import datetime, timezone
 import difflib
 import hashlib
@@ -20,7 +21,7 @@ import textwrap
 import uuid
 from urllib import error, parse, request
 
-from . import evaluators, governor, native_arkade, runtime, tasks, tools
+from . import advanced_evaluators, advanced_tasks, evaluators, governor, native_arkade, runtime, tasks, tools
 
 
 def utc_now():
@@ -38,7 +39,7 @@ def suite_hash():
     return digest.hexdigest()
 
 
-def credentials(path):
+def credentials(path, timeout=30):
     data = json.loads(Path(path).read_text())
     auth = data['toilgate']
     if auth.get('type') != 'oauth':
@@ -50,7 +51,7 @@ def credentials(path):
     req = request.Request('https://toilgate.o6s.io/token', data=body,
                           headers={'Content-Type': 'application/x-www-form-urlencoded',
                                    'User-Agent': 'rigmark-quality/0.1'}, method='POST')
-    with request.urlopen(req, timeout=30) as response:
+    with request.urlopen(req, timeout=min(30, timeout)) as response:
         refreshed = json.load(response)
     auth.update({'access': refreshed['access_token'],
                  'refresh': refreshed.get('refresh_token', auth['refresh']),
@@ -65,6 +66,7 @@ def credentials(path):
 
 def completion(endpoint, model, messages, definitions, auth_file, timeout,
                reasoning_effort, thinking, max_output_tokens, api_key_env=None):
+    deadline = time.monotonic() + timeout
     payload = {'model': model, 'messages': messages, 'temperature': 0,
                'top_p': 1, 'seed': 20261011, 'max_tokens': max_output_tokens,
                'stream': False}
@@ -81,11 +83,11 @@ def completion(endpoint, model, messages, definitions, auth_file, timeout,
             raise ValueError(f'{api_key_env} is not set')
         headers['Authorization'] = 'Bearer ' + key
     elif auth_file != 'none':
-        headers['Authorization'] = 'Bearer ' + credentials(auth_file)
+        headers['Authorization'] = 'Bearer ' + credentials(auth_file, timeout)
     req = request.Request(endpoint.rstrip('/') + '/chat/completions',
                           data=json.dumps(payload).encode(), method='POST',
                           headers=headers)
-    with request.urlopen(req, timeout=timeout) as response:
+    with request.urlopen(req, timeout=bounded_timeout(timeout, deadline)) as response:
         return json.load(response)
 
 
@@ -95,45 +97,257 @@ def make_workspace(task_id, root, arkade_root):
     return destination
 
 
-def grade_coding(task_id, workspace, image, arkade_root):
+def hidden_go_test_passed(result, task_id):
+    expected = {'go-shutdown-deadlock': 'TestRigmarkAcceptanceShutdown',
+                'go-export-boundary': 'TestRigmarkAcceptanceTenantBoundary'}[task_id]
+    return expected in result['terminal_events']['go_pass']
+
+
+def python_test_methods(source, module):
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return set()
+    return {f'{module}.{node.name}.{method.name}'
+            for node in tree.body if isinstance(node, ast.ClassDef)
+            for method in node.body if isinstance(method, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and method.name.startswith('test_')}
+
+
+def test_body(source, name):
+    source = re.sub(r'/\*.*?\*/|//[^\n]*', '', source, flags=re.S)
+    match = re.search(r'\b(?:func\s+)?' + re.escape(name) + r'\s*\([^)]*\)[^{]*\{',
+                      source)
+    if not match:
+        return ''
+    depth = 1
+    for position in range(match.end(), len(source)):
+        if source[position] == '{':
+            depth += 1
+        elif source[position] == '}':
+            depth -= 1
+            if depth == 0:
+                return source[match.end():position]
+    return ''
+
+
+def compact_test(source):
+    # The failure message is not part of a test's assertion. Models often
+    # improve it while retaining the original check and setup.
+    source = re.sub(r'(t\.Fatalf?\(\s*)"(?:\\.|[^"\\])*"', r'\1""', source)
+    return re.sub(r'[\s;]+', '', source)
+
+
+def bounded_timeout(cap, deadline):
+    if deadline is None:
+        return cap
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError('task deadline exceeded before local evaluation')
+    return min(cap, remaining)
+
+
+def grade_coding(task_id, workspace, image, arkade_root, deadline=None):
+    def run_bounded(workspace, image, command, cap):
+        return runtime.run(workspace, image, command,
+                           bounded_timeout(cap, deadline))
     if task_id == 'statement-redact':
-        return grade_statement(workspace, image)
+        return grade_statement(workspace, image, deadline)
     with tempfile.TemporaryDirectory(prefix='rigmark-public-') as directory:
         public_candidate = Path(directory) / 'candidate'
         shutil.copytree(workspace, public_candidate,
                         ignore=shutil.ignore_patterns('.git'))
-        public = runtime.run(public_candidate, image,
+        public = run_bounded(public_candidate, image,
                              runtime.public_command(task_id), 120)
     with tempfile.TemporaryDirectory(prefix='rigmark-accept-') as directory:
         candidate = Path(directory) / 'candidate'
         shutil.copytree(workspace, candidate, ignore=shutil.ignore_patterns('.git'))
-        for name, content in evaluators.files(task_id, arkade_root).items():
+        if task_id in ('go-shutdown-deadlock', 'go-export-boundary'):
+            for test_file in candidate.rglob('*_test.go'):
+                test_file.unlink()
+        marker = None
+        acceptance_files = evaluators.files(task_id, arkade_root)
+        if task_id in ('go-shutdown-deadlock', 'go-export-boundary', 'c-frame-bounds'):
+            marker = '.rigmark-acceptance-' + uuid.uuid4().hex
+            name = ('rigmark_acceptance.c' if task_id == 'c-frame-bounds'
+                    else 'rigmark_acceptance_test.go')
+            content = acceptance_files[name]
+            if task_id == 'c-frame-bounds':
+                content = content.replace('#include <assert.h>',
+                                          '#include <assert.h>\n#include <stdio.h>')
+                content = content.replace('    return 0;\n}',
+                    f'    FILE *finished = fopen("{marker}", "w");\n'
+                    '    assert(finished != NULL);\n'
+                    '    assert(fputs("completed", finished) >= 0);\n'
+                    '    assert(fclose(finished) == 0);\n'
+                    '    return 0;\n}')
+            else:
+                content = content.replace('import (', 'import (\n\t"os"', 1)
+                end = content.rfind('}')
+                content = (content[:end] +
+                    f'\tif err := os.WriteFile("{marker}", []byte("completed"), 0600); '
+                    'err != nil { t.Fatal(err) }\n' + content[end:])
+            acceptance_files[name] = content
+        for name, content in acceptance_files.items():
             target = candidate / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content)
-        result = runtime.run(candidate, image, runtime.acceptance_command(task_id),
-                             90 if task_id == 'go-worker-pool' else 45)
-    checks = {'acceptance': result['exit_code'] == 0 and not result['timeout'],
+        if task_id in ('go-shutdown-deadlock', 'go-export-boundary'):
+            binary = '.rigmark-hidden-' + uuid.uuid4().hex
+            build = run_bounded(candidate, image,
+                                f'go test -race -c -o {binary} .', 90)
+            if build['exit_code'] == 0 and not build['timeout']:
+                (candidate / 'rigmark_acceptance_test.go').unlink()
+                expected = {'go-shutdown-deadlock': 'TestRigmarkAcceptanceShutdown',
+                            'go-export-boundary': 'TestRigmarkAcceptanceTenantBoundary'}[task_id]
+                result = run_bounded(candidate, image,
+                                     f'./{binary} -test.v -test.run "^{expected}$"', 90)
+            else:
+                result = build
+        elif task_id == 'c-frame-bounds':
+            binary = '.rigmark-hidden-' + uuid.uuid4().hex
+            build = run_bounded(candidate, image,
+                                'cc -std=c11 -Wall -Wextra -Werror '
+                                '-fsanitize=address,undefined -fno-omit-frame-pointer '
+                                f'-no-pie frame.c rigmark_acceptance.c -o {binary}', 45)
+            if build['exit_code'] == 0 and not build['timeout']:
+                (candidate / 'rigmark_acceptance.c').unlink()
+                result = run_bounded(candidate, image,
+                                     f'ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 ./{binary}',
+                                     45)
+            else:
+                result = build
+        elif task_id in ('sqlite-migration', 'sqlite-report'):
+            module = task_id.replace('-', '_') + '_acceptance'
+            build = run_bounded(candidate, image,
+                                'python3 -B -c "import py_compile; '
+                                f"py_compile.compile('{module}.py', "
+                                f"cfile='{module}.pyc', doraise=True)\"", 30)
+            if build['exit_code'] == 0 and not build['timeout']:
+                (candidate / f'{module}.py').unlink()
+                result = run_bounded(candidate, image,
+                                     runtime.acceptance_command(task_id), 45)
+            else:
+                result = build
+        else:
+            result = run_bounded(candidate, image,
+                                 runtime.acceptance_command(task_id),
+                                 90 if task_id == 'go-worker-pool' else 45)
+        marker_path = candidate / marker if marker else None
+        marker_written = (marker_path.is_file() and marker_path.stat().st_size == 9
+                          and marker_path.read_bytes() == b'completed') \
+            if marker_path else True
+    # SQLite's sealed unittest module runs in the parent Python process.
+    # Candidate migration code runs in a child with stdout sent to /dev/null;
+    # its terminal text cannot prove, or replace, the parent assertions.
+    hidden_ran = (hidden_go_test_passed(result, task_id)
+                  if task_id in ('go-shutdown-deadlock', 'go-export-boundary')
+                  else True)
+    checks = {'acceptance': result['exit_code'] == 0 and not result['timeout']
+              and hidden_ran and marker_written,
               'public_tests': public['exit_code'] == 0 and not public['timeout']}
     result['public_tests'] = public
     test_name = {'python-expiry': 'test_expiry.py',
                  'node-idempotency': 'store.test.js',
                  'go-worker-pool': 'pool_test.go',
-                 'go-transfer-ledger': 'transfer_test.go'}[task_id]
-    checks['regression_test_added'] = len((workspace / test_name).read_text()) > len(tasks.TASKS[task_id]['files'][test_name]) + 20
-    if task_id in ('go-worker-pool', 'go-transfer-ledger'):
-        source_name = 'pool.go' if task_id == 'go-worker-pool' else 'transfer.go'
+                 'go-transfer-ledger': 'transfer_test.go',
+                 'sqlite-migration': 'test_migration.py',
+                 'sqlite-report': 'test_report.py',
+                 'go-shutdown-deadlock': 'service_test.go',
+                 'go-export-boundary': 'server_test.go',
+                 'c-frame-bounds': 'frame_test.c'}[task_id]
+    if task_id in ('sqlite-migration', 'sqlite-report'):
+        module = test_name.removesuffix('.py')
+        baseline_methods = python_test_methods(tasks.TASKS[task_id]['files'][test_name], module)
+        candidate_methods = python_test_methods((workspace / test_name).read_text(), module)
+        added_methods = candidate_methods - baseline_methods
+        checks['regression_test_added'] = len(candidate_methods) > len(baseline_methods)
+        with tempfile.TemporaryDirectory(prefix='rigmark-sqlite-regression-') as directory:
+            original = Path(directory) / 'candidate'
+            shutil.copytree(workspace, original)
+            restore = (('migration.py',) if task_id == 'sqlite-migration'
+                       else ('report.sql', 'indexes.sql'))
+            for name in restore:
+                (original / name).write_text(tasks.TASKS[task_id]['files'][name])
+            regression = run_bounded(original, image, runtime.public_command(task_id), 90)
+        failed_new_test = bool(set(added_methods)
+                               & set(regression['terminal_events']['python_failed']))
+        checks['regression_fails_on_original'] = (
+            regression['exit_code'] != 0 and not regression['timeout']
+            and failed_new_test
+            and not regression['terminal_events']['source_error'])
+        result['regression_control'] = regression
+    elif task_id in ('go-shutdown-deadlock', 'go-export-boundary', 'c-frame-bounds'):
+        original_tests = tasks.TASKS[task_id]['files'][test_name]
+        candidate_tests = (workspace / test_name).read_text()
+        if task_id == 'c-frame-bounds':
+            original_body = test_body(original_tests, 'main')
+            candidate_body = test_body(candidate_tests, 'main')
+            added = candidate_body.count('assert(') > original_body.count('assert(')
+            new_test_names = []
+        else:
+            baseline_names = set(re.findall(r'\bfunc\s+(Test\w+)\s*\(', original_tests))
+            candidate_names = set(re.findall(r'\bfunc\s+(Test\w+)\s*\(', candidate_tests))
+            new_test_names = sorted(candidate_names - baseline_names)
+            added = bool(new_test_names)
+        # A candidate test file can retain the original assertions as dead
+        # text. Run our original test in a clean copy against its source.
+        with tempfile.TemporaryDirectory(prefix='rigmark-baseline-') as directory:
+            baseline = Path(directory) / 'candidate'
+            shutil.copytree(workspace, baseline)
+            (baseline / test_name).write_text(original_tests)
+            baseline_run = run_bounded(baseline, image,
+                                       runtime.public_command(task_id), 90)
+        checks['baseline_contract'] = (baseline_run['exit_code'] == 0
+                                       and not baseline_run['timeout'])
+        result['baseline_control'] = baseline_run
+        checks['regression_test_added'] = added
+    else:
+        checks['regression_test_added'] = (
+            len((workspace / test_name).read_text())
+            > len(tasks.TASKS[task_id]['files'][test_name]) + 20)
+    if task_id in ('go-shutdown-deadlock', 'go-export-boundary', 'c-frame-bounds'):
+        source_name = {'go-shutdown-deadlock': 'service.go',
+                       'go-export-boundary': 'server.go',
+                       'c-frame-bounds': 'frame.c'}[task_id]
+        with tempfile.TemporaryDirectory(prefix='rigmark-regression-') as directory:
+            original = Path(directory) / 'candidate'
+            shutil.copytree(workspace, original)
+            (original / source_name).write_text(tasks.TASKS[task_id]['files'][source_name])
+            command = runtime.public_command(task_id)
+            if new_test_names:
+                names = '|'.join(re.escape(name) for name in new_test_names)
+                command = (f'go test -race -count=1 -timeout=30s '
+                           f'-run "^({names})$" .')
+            regression = run_bounded(original, image, command, 35)
+        events = regression['terminal_events']
+        checks['regression_fails_on_original'] = (
+            (regression['exit_code'] != 0 or regression['timeout'])
+            and not events['build_failed']
+            and not (task_id == 'c-frame-bounds'
+                     and events['c_compile_error']))
+        result['regression_control'] = regression
+    if task_id in ('go-worker-pool', 'go-transfer-ledger',
+                   'go-shutdown-deadlock', 'go-export-boundary'):
+        source_name = {'go-worker-pool': 'pool.go',
+                       'go-transfer-ledger': 'transfer.go',
+                       'go-shutdown-deadlock': 'service.go',
+                       'go-export-boundary': 'server.go'}[task_id]
         formatted = subprocess.run(['docker', 'run', '--rm', '--network=none',
             '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges',
             '--user=1000:1000', '-v', f'{workspace.resolve()}:/workspace:ro',
             '-w', '/workspace', image, 'gofmt', '-l', source_name, test_name],
-            text=True, capture_output=True, timeout=30)
+            text=True, capture_output=True,
+            timeout=bounded_timeout(30, deadline))
         checks['gofmt'] = formatted.returncode == 0 and not formatted.stdout.strip()
     return checks, result
 
 
-def grade_statement(workspace, image):
+def grade_statement(workspace, image, deadline=None):
     """Run the candidate, then inject the hidden judge into a stopped copy."""
+    def run_bounded(workspace, image, command, cap):
+        return runtime.run(workspace, image, command,
+                           bounded_timeout(cap, deadline))
     fixture_root = Path(__file__).parent / 'fixtures'
     hidden = json.loads((fixture_root / 'hidden-bank-rows.json').read_text())
     cases = [('public', fixture_root / 'synthetic-bank-statement.pdf', None)]
@@ -147,7 +361,7 @@ def grade_statement(workspace, image):
             candidate = Path(directory) / 'candidate'
             shutil.copytree(workspace, candidate)
             shutil.copyfile(source, candidate / 'bank_statement.pdf')
-            run = runtime.run(candidate, image,
+            run = run_bounded(candidate, image,
                               'python3 -B redact_statement.py bank_statement.pdf redacted.pdf',
                               90)
             timed_out |= run['timeout']
@@ -164,7 +378,7 @@ rows = json.load(open("expected_rows.json"))
 rows = tuple(Transaction(**row) for row in rows) if rows else ROWS
 print(json.dumps(judge("redacted.pdf", rows)))
 ''')
-            judged = runtime.run(candidate, image, 'python3 -B judge_run.py', 90)
+            judged = run_bounded(candidate, image, 'python3 -B judge_run.py', 90)
             timed_out |= judged['timeout']
             try:
                 verdict = json.loads(judged['output'].strip()) if judged['exit_code'] == 0 else {}
@@ -179,14 +393,16 @@ print(json.dumps(judge("redacted.pdf", rows)))
 
 def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
              max_steps, seconds, reasoning_effort, thinking,
-             max_output_tokens=32768, api_key_env=None):
+             max_output_tokens=32768, api_key_env=None, serving_metadata=None):
     if task_id == 'arkade-add':
         raise ValueError('arkade-add requires the native OpenCode runner')
     active_suite_hash = suite_hash()
     workspace = make_workspace(task_id, root, arkade_root)
     originals = {path: (workspace / path).read_text() if (workspace / path).exists() else ''
                  for path in tasks.TASKS[task_id]['editable']}
-    box = tools.ToolBox(task_id, workspace, image)
+    started = time.monotonic()
+    deadline = started + seconds
+    box = tools.ToolBox(task_id, workspace, image, deadline=deadline)
     guard = governor.Governor(task_id, workspace, tasks.TASKS[task_id]['editable'])
     initial_digest = guard.digest()
     messages = [{'role': 'system', 'content':
@@ -195,14 +411,13 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
                  'Only claim actions that tools confirm. Keep the final answer concise.'},
                 {'role': 'user', 'content': tasks.TASKS[task_id]['prompt']}]
     started_at = utc_now()
-    started = time.monotonic()
     event_log = []
     failure = None
     answer = ''
     observed_models = []
     conversation_finished = False
     for step in itertools.count():
-        remaining = seconds - (time.monotonic() - started)
+        remaining = deadline - time.monotonic()
         if remaining <= 0:
             failure = 'task deadline exceeded'
             break
@@ -211,7 +426,7 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
             break
         try:
             data = completion(endpoint, model, messages, box.definitions, auth_file,
-                              max(1, remaining), reasoning_effort,
+                              remaining, reasoning_effort,
                               thinking, max_output_tokens, api_key_env)
             observed_models.append(data.get('model'))
             msg = data['choices'][0]['message']
@@ -241,6 +456,9 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
                     notice = reminder
                 if stop:
                     failure = stop
+                if time.monotonic() >= deadline:
+                    failure = 'task deadline exceeded'
+                    break
             if failure:
                 break
             reminder, stop = guard.exploration(step + 1,
@@ -256,8 +474,17 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
             failure = f'{type(exc).__name__}: {exc}'
             break
     if task_id in ('python-expiry', 'node-idempotency', 'go-worker-pool',
-                   'go-transfer-ledger', 'statement-redact'):
-        checks, acceptance = grade_coding(task_id, workspace, image, arkade_root)
+                   'go-transfer-ledger', 'statement-redact',
+                   'sqlite-migration', 'sqlite-report',
+                   'go-shutdown-deadlock', 'go-export-boundary', 'c-frame-bounds'):
+        try:
+            checks, acceptance = grade_coding(task_id, workspace, image,
+                                               arkade_root, deadline)
+        except (TimeoutError, subprocess.TimeoutExpired):
+            failure = 'task deadline exceeded'
+            checks = {'task_deadline': False}
+            acceptance = {'exit_code': -1, 'timeout': True,
+                          'output': 'task deadline exceeded during evaluation'}
     else:
         checks = box.grade(answer)
         acceptance = None
@@ -305,10 +532,12 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
         details = item.get('completion_tokens_details') or {}
         usage['reasoning_tokens'] += details.get('reasoning_tokens') or 0
     result = {'task': task_id, 'category': tasks.TASKS[task_id]['category'],
+              'harness': 'typed-tools-v1',
+              'serving': serving_metadata,
               'interpretation': 'diagnostic_only',
               'task_status': ('exploratory' if task_id == 'statement-redact'
                               else 'experimental'),
-              'suite_version': '0.8', 'suite_sha256': active_suite_hash,
+              'suite_version': '1.0', 'suite_sha256': active_suite_hash,
               'task_sha256': task_hash,
               'request': {'temperature': 0, 'top_p': 1, 'seed': 20261011,
                           'max_tokens': max_output_tokens, 'max_steps': max_steps,
@@ -331,7 +560,10 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
               'conversation_finished': conversation_finished,
               'governor_notices': guard.notices,
               'passed': all(checks.values()) and clean_models and failure is None,
-              'failure': failure, 'answer': answer,
+              'failure': failure, 'stop_reason': failure or 'normal',
+              'answer': answer,
+              'review_output_format': (advanced_evaluators.review_format(answer)
+                                       if task_id == 'go-concurrency-review' else None),
               'calls': box.calls, 'events': event_log, 'acceptance': acceptance,
               'changes': changes}
     return result
@@ -340,7 +572,9 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
 def selftest(root, arkade_root, image):
     outcomes = {}
     for task_id in ('python-expiry', 'node-idempotency', 'go-worker-pool',
-                    'go-transfer-ledger', 'statement-redact'):
+                    'go-transfer-ledger', 'statement-redact',
+                    'sqlite-migration', 'sqlite-report',
+                    'go-shutdown-deadlock', 'go-export-boundary', 'c-frame-bounds'):
         with tempfile.TemporaryDirectory(prefix='rigmark-control-') as directory:
             parent = Path(directory)
             broken = make_workspace(task_id, parent, arkade_root)
@@ -349,7 +583,8 @@ def selftest(root, arkade_root, image):
             good = make_workspace(task_id, parent / 'good', arkade_root)
             tasks.reference(task_id, good)
             format_result = None
-            if task_id in ('go-worker-pool', 'go-transfer-ledger'):
+            if task_id in ('go-worker-pool', 'go-transfer-ledger',
+                           'go-shutdown-deadlock', 'go-export-boundary'):
                 format_result = tools.ToolBox(task_id, good, image).call('format_go', '{}')
             good_checks, good_result = grade_coding(task_id, good, image, arkade_root)
             if format_result is not None:
@@ -357,6 +592,396 @@ def selftest(root, arkade_root, image):
             outcomes[task_id] = {'broken': broken_checks, 'broken_exit': broken_result['exit_code'],
                                  'reference': good_checks, 'reference_exit': good_result['exit_code'],
                                  'reference_output': good_result['output'][-2000:] if not all(good_checks.values()) else ''}
+            if task_id in ('go-shutdown-deadlock', 'go-export-boundary'):
+                with (broken / {'go-shutdown-deadlock': 'service_test.go',
+                                'go-export-boundary': 'server_test.go'}[task_id]).open('a') as tests:
+                    tests.write('\nfunc TestMain(m *testing.M) {}\n')
+                bypass_checks, _ = grade_coding(task_id, broken, image, arkade_root)
+                outcomes[task_id + '-testmain'] = {
+                    'reference': {'hidden_acceptance': good_checks['acceptance'],
+                                  'public_bypass': bypass_checks['public_tests']},
+                    'broken': {'hidden_acceptance': bypass_checks['acceptance']}}
+                forged = parent / 'forged'
+                shutil.copytree(good, forged)
+                source_name = ('service.go' if task_id == 'go-shutdown-deadlock'
+                               else 'server.go')
+                named_test = ('TestRigmarkAcceptanceShutdown' if task_id == 'go-shutdown-deadlock'
+                              else 'TestRigmarkAcceptanceTenantBoundary')
+                source = forged / source_name
+                contents = source.read_text()
+                if task_id == 'go-shutdown-deadlock':
+                    contents = contents.replace('import "sync"',
+                                                'import ("sync"; "fmt"; "os")', 1)
+                else:
+                    contents = contents.replace('import (',
+                                                'import (\n"fmt"\n"os"', 1)
+                contents += (f'\nfunc init() {{ fmt.Println("=== RUN   {named_test}"); '
+                             f'fmt.Println("--- PASS: {named_test} (0.00s)"); '
+                             'os.Exit(0) }\n')
+                source.write_text(contents)
+                forged_checks, forged_result = grade_coding(task_id, forged, image, arkade_root)
+                outcomes[task_id + '-forged-pass'] = {
+                    'reference': {'hidden_acceptance': good_checks['acceptance'],
+                                  'public_bypass': forged_checks['public_tests']},
+                    'broken': {'hidden_acceptance': forged_checks['acceptance'],
+                               'forged_go_event': hidden_go_test_passed(forged_result, task_id)}}
+            if task_id == 'go-shutdown-deadlock':
+                discarded = parent / 'discarded-accepted-jobs'
+                shutil.copytree(good, discarded)
+                source = discarded / 'service.go'
+                contents = source.read_text()
+                old = ('\tselect {\n\tcase s.jobs <- job:\n\t\treturn true\n'
+                       '\tdefault:\n\t\treturn false\n\t}')
+                assert old in contents
+                source.write_text(contents.replace(old, '\ts.processed++\n\treturn true', 1))
+                discarded_checks, _ = grade_coding(task_id, discarded, image, arkade_root)
+                outcomes['go-shutdown-discarded-jobs'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_tests': discarded_checks['public_tests']},
+                    'broken': {'acceptance': discarded_checks['acceptance']}}
+            if task_id in ('sqlite-migration', 'sqlite-report'):
+                test_file = broken / ('test_migration.py' if task_id == 'sqlite-migration'
+                                      else 'test_report.py')
+                with test_file.open('a') as tests:
+                    tests.write('\n# This is a comment, not a regression test.\n')
+                comment_checks, _ = grade_coding(task_id, broken, image, arkade_root)
+                outcomes[task_id + '-comment'] = {
+                    'reference': {'new_test': good_checks['regression_test_added'],
+                                  'fails_old': good_checks['regression_fails_on_original']},
+                    'broken': {'comment_only': comment_checks['regression_test_added']}}
+            if task_id == 'sqlite-migration':
+                forged = parent / 'sqlite-forged-child-success'
+                shutil.copytree(good, forged)
+                source = forged / 'migration.py'
+                source.write_text(source.read_text().replace(
+                    'def migrate(conn):\n',
+                    'def migrate(conn):\n'
+                    '    import os\n'
+                    '    if "rigmark-migration-" in conn.execute("PRAGMA database_list").fetchone()[2]:\n'
+                    '        print("test_caller_can_roll_back_migration (sqlite_migration_acceptance.Acceptance.test_caller_can_roll_back_migration) ... ok\\n"\n'
+                    '              "test_conflicting_metadata_rolls_back_everything (sqlite_migration_acceptance.Acceptance.test_conflicting_metadata_rolls_back_everything) ... ok\\n"\n'
+                    '              "test_empty_legacy_schema_migrates (sqlite_migration_acceptance.Acceptance.test_empty_legacy_schema_migrates) ... ok\\n"\n'
+                    '              "test_every_line_and_other_table_survive (sqlite_migration_acceptance.Acceptance.test_every_line_and_other_table_survive) ... ok\\n"\n'
+                    '              "Ran 4 tests in 0.01s\\n\\nOK")\n'
+                    '        os._exit(0)\n', 1))
+                forged_checks, _ = grade_coding(task_id, forged, image, arkade_root)
+                outcomes['sqlite-migration-forged-child-success'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_tests': forged_checks['public_tests']},
+                    'broken': {'acceptance': forged_checks['acceptance']}}
+                disabled_fk = parent / 'disabled-foreign-keys'
+                shutil.copytree(good, disabled_fk)
+                source = disabled_fk / 'migration.py'
+                source.write_text(source.read_text().replace(
+                    'def migrate(conn):\n',
+                    'def migrate(conn):\n'
+                    '    if not conn.in_transaction:\n'
+                    '        conn.execute("PRAGMA foreign_keys = OFF")\n', 1))
+                disabled_checks, _ = grade_coding(task_id, disabled_fk, image, arkade_root)
+                outcomes['sqlite-migration-foreign-keys'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': disabled_checks['acceptance']}}
+                empty = parent / 'sqlite-empty-skip'
+                shutil.copytree(good, empty)
+                source = empty / 'migration.py'
+                source.write_text(source.read_text().replace(
+                    'def migrate(conn):\n',
+                    'def migrate(conn):\n'
+                    '    if "invoice_lines" in {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type=\'table\'")} and not conn.execute("SELECT 1 FROM invoice_lines LIMIT 1").fetchone():\n'
+                    '        return\n', 1))
+                (empty / 'test_migration.py').write_text(
+                    tasks.TASKS[task_id]['files']['test_migration.py'])
+                empty_checks, _ = grade_coding(task_id, empty, image, arkade_root)
+                outcomes['sqlite-migration-empty-skip'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_tests': empty_checks['public_tests']},
+                    'broken': {'acceptance': empty_checks['acceptance']}}
+                early_exit = parent / 'sqlite-import-exit'
+                shutil.copytree(good, early_exit)
+                source = early_exit / 'migration.py'
+                source.write_text(
+                    'import os\nfrom pathlib import Path\n'
+                    'if Path("sqlite_migration_acceptance.pyc").exists(): '
+                    'os._exit(0)\n' + source.read_text())
+                early_checks, _ = grade_coding(
+                    task_id, early_exit, image, arkade_root)
+                outcomes['sqlite-migration-import-exit'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_tests': early_checks['public_tests']},
+                    'broken': {'acceptance': early_checks['acceptance']}}
+                rollback = parent / 'rollback-entry'
+                shutil.copytree(good, rollback)
+                source = rollback / 'migration.py'
+                source.write_text(source.read_text().replace(
+                    'def migrate(conn):\n', 'def migrate(conn):\n    conn.rollback()\n', 1))
+                rollback_checks, _ = grade_coding(task_id, rollback, image, arkade_root)
+                outcomes['sqlite-migration-rollback-entry'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': rollback_checks['acceptance']}}
+                conflict_rollback = parent / 'rollback-conflict'
+                shutil.copytree(good, conflict_rollback)
+                source = conflict_rollback / 'migration.py'
+                source.write_text(source.read_text().replace(
+                    'raise ValueError("conflicting metadata for invoice " + invoice_id)',
+                    'conn.rollback()\n                '
+                    'raise ValueError("conflicting metadata for invoice " + invoice_id)'))
+                conflict_checks, _ = grade_coding(
+                    task_id, conflict_rollback, image, arkade_root)
+                outcomes['sqlite-migration-rollback-conflict'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': conflict_checks['acceptance']}}
+                weak_schema = parent / 'weak-schema'
+                shutil.copytree(good, weak_schema)
+                source = weak_schema / 'migration.py'
+                source.write_text(source.read_text().replace(
+                    'invoice_id TEXT PRIMARY KEY NOT NULL, ',
+                    'invoice_id TEXT, ', 1))
+                weak_schema_checks, _ = grade_coding(
+                    task_id, weak_schema, image, arkade_root)
+                outcomes['sqlite-migration-weak-schema'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': weak_schema_checks['acceptance']}}
+                casefold = parent / 'casefold-primary-key'
+                shutil.copytree(good, casefold)
+                source = casefold / 'migration.py'
+                source.write_text(source.read_text().replace(
+                    'invoice_id TEXT PRIMARY KEY NOT NULL, ',
+                    'invoice_id TEXT PRIMARY KEY NOT NULL COLLATE NOCASE, ', 1))
+                casefold_checks, _ = grade_coding(task_id, casefold, image, arkade_root)
+                outcomes['sqlite-migration-casefold-key'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_tests': casefold_checks['public_tests']},
+                    'broken': {'acceptance': casefold_checks['acceptance']}}
+                rerun = parent / 'destructive-rerun'
+                shutil.copytree(good, rerun)
+                source = rerun / 'migration.py'
+                source.write_text(source.read_text().replace(
+                    'if {"invoices", "invoice_items"} <= tables:\n            return',
+                    'if {"invoices", "invoice_items"} <= tables:\n'
+                    '            conn.execute("DROP TABLE audit_log")\n            return'))
+                rerun_checks, _ = grade_coding(task_id, rerun, image, arkade_root)
+                outcomes['sqlite-migration-destructive-rerun'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': rerun_checks['acceptance']}}
+            if task_id == 'go-export-boundary':
+                header_spoof = parent / 'header-spoof'
+                shutil.copytree(good, header_spoof)
+                source = header_spoof / 'server.go'
+                source.write_text(source.read_text().replace(
+                    'user, ok := UserFromContext(r.Context())\n',
+                    'user, ok := UserFromContext(r.Context())\n'
+                    'if !ok { user = r.Header.Get("X-User"); ok = user != "" }\n', 1))
+                header_checks, _ = grade_coding(task_id, header_spoof, image, arkade_root)
+                outcomes['go-export-header-identity'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_tests': header_checks['public_tests']},
+                    'broken': {'acceptance': header_checks['acceptance']}}
+                missing_id = parent / 'missing-owner-id'
+                shutil.copytree(good, missing_id)
+                source = missing_id / 'server.go'
+                source.write_text(source.read_text().replace('json:"id"', 'json:"-"', 1))
+                id_checks, _ = grade_coding(task_id, missing_id, image, arkade_root)
+                outcomes['go-export-missing-id'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_tests': id_checks['public_tests']},
+                    'broken': {'acceptance': id_checks['acceptance']}}
+                metadata = parent / 'forbidden-metadata'
+                shutil.copytree(good, metadata)
+                source = metadata / 'server.go'
+                contents = source.read_text()
+                old = ('if !ok || item.Owner != user {\n'
+                       '\t\thttp.NotFound(w, r)\n\t\treturn\n\t}')
+                assert old in contents
+                source.write_text(contents.replace(
+                    old, old.replace('http.NotFound(w, r)',
+                                     'http.Error(w, item.ID, http.StatusNotFound)'), 1))
+                metadata_checks, _ = grade_coding(task_id, metadata, image, arkade_root)
+                outcomes['go-export-forbidden-metadata'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_tests': metadata_checks['public_tests']},
+                    'broken': {'acceptance': metadata_checks['acceptance']}}
+                leaked = parent / 'unauthenticated-leak'
+                shutil.copytree(good, leaked)
+                source = leaked / 'server.go'
+                contents = source.read_text()
+                unauthorised = 'http.Error(w, "unauthorised", http.StatusUnauthorized)'
+                assert unauthorised in contents
+                source.write_text(contents.replace(
+                    unauthorised,
+                    'w.WriteHeader(http.StatusUnauthorized); '
+                    'w.Write([]byte("alice-private"))'))
+                leak_checks, _ = grade_coding(task_id, leaked, image, arkade_root)
+                outcomes['go-export-unauthenticated-leak'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': leak_checks['acceptance']}}
+            if task_id == 'c-frame-bounds':
+                null_unsafe = parent / 'null-unsafe'
+                shutil.copytree(good, null_unsafe)
+                source = null_unsafe / 'frame.c'
+                source.write_text(source.read_text().replace(
+                    'if (!frame || !out || frame_len < 1 || out_cap < 1)',
+                    'if (frame_len < 1 || out_cap < 1)'))
+                null_checks, _ = grade_coding(task_id, null_unsafe, image, arkade_root)
+                outcomes['c-frame-null-pointer'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': null_checks['acceptance']}}
+                source = good / 'frame.c'
+                source.write_text(source.read_text().replace('payload_len >= out_cap',
+                                                             'payload_len > out_cap'))
+                boundary_checks, _ = grade_coding(task_id, good, image, arkade_root)
+                outcomes['c-frame-exact-cap'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': boundary_checks['acceptance']}}
+                exiting = parent / 'constructor-exit'
+                shutil.copytree(good, exiting)
+                source = exiting / 'frame.c'
+                source.write_text('#include <stdlib.h>\n'
+                                  '__attribute__((constructor)) static void exit_early(void) '
+                                  '{ exit(0); }\n' + source.read_text())
+                exit_checks, _ = grade_coding(task_id, exiting, image, arkade_root)
+                outcomes['c-frame-constructor-exit'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_bypass': exit_checks['public_tests']},
+                    'broken': {'acceptance': exit_checks['acceptance']}}
+            if task_id == 'sqlite-report':
+                partial = parent / 'partial-index'
+                shutil.copytree(good, partial)
+                (partial / 'indexes.sql').write_text(
+                    "CREATE INDEX orders_paid_date ON orders(ordered_on, customer_id) "
+                    "WHERE status = 'paid';\n"
+                    'CREATE INDEX order_lines_order_id ON order_lines(order_id);\n')
+                partial_checks, _ = grade_coding(task_id, partial, image, arkade_root)
+                narrower = parent / 'nonnull-partial-index'
+                shutil.copytree(good, narrower)
+                (narrower / 'indexes.sql').write_text(
+                    "CREATE INDEX orders_paid_nonnull ON orders(ordered_on, customer_id) "
+                    "WHERE status = 'paid' AND ordered_on IS NOT NULL;\n"
+                    'CREATE INDEX order_lines_order_id ON order_lines(order_id);\n')
+                query = narrower / 'report.sql'
+                query.write_text(query.read_text().replace(
+                    'FROM orders AS o',
+                    'FROM orders AS o INDEXED BY orders_paid_nonnull').replace(
+                    'o.ordered_on >= :since',
+                    'o.ordered_on >= :since AND o.ordered_on IS NOT NULL'))
+                narrower_checks, _ = grade_coding(task_id, narrower, image, arkade_root)
+                outcomes['sqlite-report-nonnull-partial'] = {
+                    'reference': {'acceptance': narrower_checks['acceptance']},
+                    'broken': {'missing_index': broken_checks['acceptance']}}
+                changed_setting = parent / 'changed-fk-setting'
+                shutil.copytree(good, changed_setting)
+                with (changed_setting / 'indexes.sql').open('a') as sql:
+                    sql.write('\nPRAGMA foreign_keys = OFF;\n')
+                setting_checks, _ = grade_coding(task_id, changed_setting, image, arkade_root)
+                outcomes['sqlite-report-schema-setting'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': setting_checks['acceptance']}}
+                invalid_partial = parent / 'invalid-partial-index'
+                shutil.copytree(good, invalid_partial)
+                (invalid_partial / 'indexes.sql').write_text(
+                    "CREATE INDEX orders_pending_date ON orders(ordered_on, customer_id) "
+                    "WHERE status = 'pending';\n"
+                    'CREATE INDEX order_lines_order_id ON order_lines(order_id);\n')
+                invalid_partial_checks, _ = grade_coding(
+                    task_id, invalid_partial, image, arkade_root)
+                broad_partial = parent / 'broad-partial-index'
+                shutil.copytree(good, broad_partial)
+                (broad_partial / 'indexes.sql').write_text(
+                    "CREATE INDEX orders_broad_date ON orders(ordered_on, customer_id) "
+                    "WHERE status = 'paid' OR status <> 'paid';\n"
+                    'CREATE INDEX order_lines_order_id ON order_lines(order_id);\n')
+                broad_partial_checks, _ = grade_coding(
+                    task_id, broad_partial, image, arkade_root)
+                outcomes['sqlite-report-partial-index'] = {
+                    'reference': {'valid_partial_index': partial_checks['acceptance']},
+                    'broken': {'invalid_partial_index': invalid_partial_checks['acceptance'],
+                               'broad_partial_index': broad_partial_checks['acceptance']}}
+                quoted = parent / 'quoted-index'
+                shutil.copytree(good, quoted)
+                (quoted / 'indexes.sql').write_text(
+                    'CREATE INDEX "orders paid date" ON orders(status, ordered_on, customer_id);\n'
+                    'CREATE INDEX "order lines lookup" ON order_lines(order_id);\n')
+                quoted_checks, _ = grade_coding(task_id, quoted, image, arkade_root)
+                outcomes['sqlite-report-quoted-index'] = {
+                    'reference': {'acceptance': quoted_checks['acceptance']},
+                    'broken': {'invalid_partial_index': invalid_partial_checks['acceptance']}}
+                weak = parent / 'weak-index'
+                shutil.copytree(good, weak)
+                (weak / 'indexes.sql').write_text(
+                    'CREATE INDEX orders_date_status ON orders(ordered_on, status);\n'
+                    'CREATE INDEX order_lines_order_id ON order_lines(order_id);\n')
+                weak_checks, _ = grade_coding(task_id, weak, image, arkade_root)
+                outcomes['sqlite-report-weak-index'] = {
+                    'reference': {'valid_index': good_checks['acceptance']},
+                    'broken': {'weak_index': weak_checks['acceptance']}}
+                noop = parent / 'indexed-noop-probes'
+                shutil.copytree(good, noop)
+                query = noop / 'report.sql'
+                contents = query.read_text()
+                contents = contents.replace('FROM orders AS o\n',
+                                            'FROM orders AS o NOT INDEXED\n')
+                contents = contents.replace('JOIN order_lines AS li ON li.order_id = o.id\n',
+                                            'JOIN order_lines AS li NOT INDEXED ON li.order_id = o.id\n')
+                contents = contents.replace(
+                    "WHERE o.status = 'paid' AND o.ordered_on >= :since\n",
+                    "WHERE o.status = 'paid' AND o.ordered_on >= :since\n"
+                    "AND EXISTS (SELECT 1 FROM orders AS probe INDEXED BY orders_status_date_customer WHERE probe.status = 'paid' AND probe.ordered_on >= :since)\n"
+                    "AND EXISTS (SELECT 1 FROM order_lines AS probe_line INDEXED BY order_lines_order_id WHERE probe_line.order_id = li.order_id)\n")
+                query.write_text(contents)
+                noop_checks, _ = grade_coding(task_id, noop, image, arkade_root)
+                outcomes['sqlite-report-indexed-noop-probes'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_tests': noop_checks['public_tests']},
+                    'broken': {'acceptance': noop_checks['acceptance']}}
+                exclusive = parent / 'exclusive-date'
+                shutil.copytree(good, exclusive)
+                query = exclusive / 'report.sql'
+                query.write_text(query.read_text().replace('>= :since', '> :since'))
+                exclusive_checks, _ = grade_coding(task_id, exclusive, image, arkade_root)
+                outcomes['sqlite-report-exclusive-date'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': exclusive_checks['acceptance']}}
+                wrong_alias = parent / 'wrong-report-alias'
+                shutil.copytree(good, wrong_alias)
+                query = wrong_alias / 'report.sql'
+                query.write_text(query.read_text().replace(
+                    'AS revenue_cents', 'AS total_cents'))
+                alias_checks, _ = grade_coding(
+                    task_id, wrong_alias, image, arkade_root)
+                outcomes['sqlite-report-wrong-alias'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': alias_checks['acceptance']}}
+    with tempfile.TemporaryDirectory(prefix='rigmark-review-control-') as directory:
+        review_workspace = make_workspace('go-concurrency-review', Path(directory), arkade_root)
+        review_box = tools.ToolBox('go-concurrency-review', review_workspace, image)
+        for name in ('candidate_a/dispatcher.go', 'candidate_a/worker.go',
+                     'candidate_b/dispatcher.go', 'candidate_b/worker.go'):
+            review_box.call('read_file', json.dumps({'path': name, 'offset': 0, 'limit': 250}))
+        review_calls = review_box.calls
+        failed_calls = [dict(call) for call in review_calls]
+        failed_calls[0]['result'] = {'error': 'file not found', 'kind': 'invalid_tool_call'}
+        partial_box = tools.ToolBox('go-concurrency-review', review_workspace, image)
+        for name in ('candidate_a/dispatcher.go', 'candidate_a/worker.go',
+                     'candidate_b/dispatcher.go', 'candidate_b/worker.go'):
+            partial_box.call('read_file', json.dumps({
+                'path': name, 'offset': 0,
+                'limit': 1 if name == 'candidate_b/dispatcher.go' else 250}))
+        outcomes['go-concurrency-review-inspection'] = {
+            'reference': {'full_reads': advanced_evaluators.grade_review(
+                json.dumps(advanced_tasks.REVIEW_REFERENCE), review_calls)['inspected_both']},
+            'broken': {
+                'failed_read': advanced_evaluators.grade_review(
+                    json.dumps(advanced_tasks.REVIEW_REFERENCE), failed_calls)['inspected_both'],
+                'partial_read': advanced_evaluators.grade_review(
+                    json.dumps(advanced_tasks.REVIEW_REFERENCE), partial_box.calls)['inspected_both']}}
+    outcomes['go-concurrency-review'] = {
+        'broken': advanced_evaluators.grade_review(
+            json.dumps({'findings': [{'file': 'candidate_a/dispatcher.go',
+                                      'kind': 'data_race',
+                                      'evidence': 'A mutex does not protect anything.'}],
+                        'clear': ['candidate_b/dispatcher.go']}), review_calls),
+        'reference': advanced_evaluators.grade_review(
+            json.dumps(advanced_tasks.REVIEW_REFERENCE), review_calls),
+    }
     with tempfile.TemporaryDirectory(prefix='rigmark-native-arkade-control-') as directory:
         parent = Path(directory)
         broken = make_workspace('arkade-add', parent, arkade_root)
@@ -577,13 +1202,16 @@ def ascii_card(key, receipts):
         if finished is None:
             finished = receipt.get('failure') is None
         mark = lambda value: 'yes' if value else 'no'
-        stop = receipt.get('failure') or 'normal'
+        stop = receipt.get('stop_reason') or receipt.get('failure') or 'normal'
         stop = textwrap.shorten(str(stop), width=17, placeholder='…')
         row(f"{receipt['task'][:27]:27} {mark(artefact):9} "
             f"{mark(finished):9} {receipt.get('elapsed_seconds', 0):>6.1f}s {stop}")
     row()
     row('Artefact and conversation completion are separate outcomes.')
-    row('Read the JSON receipt for checks, tool calls, and stop reasons.')
+    if all(r.get('receipt_kind') == 'public_summary' for r in receipts):
+        row('Read the JSON summary for checks and stop state.')
+    else:
+        row('Read the JSON receipt for checks, tool calls, and stop reasons.')
     row()
     section('RUN')
     row(f"Tasks {len(receipts)}  ·  Suite {receipts[0].get('suite_version', '?')}  ·  SHA256 {suite_hash[:16]}…")
@@ -636,6 +1264,8 @@ def main():
                         help='Optional Toilgate OAuth file; default: no authentication')
     parser.add_argument('--toilgate', action='store_true',
                         help='Use the locally signed-in Toilgate account')
+    parser.add_argument('--serving-metadata', type=Path,
+                        help='JSON object identifying checkpoint, quantisation, engine, and hardware')
     parser.add_argument('--agent-model',
                         help='OpenCode provider/model for the native arkade task; with --toilgate, defaults to toilgate/MODEL_ID')
     parser.add_argument('--agent-config-file', type=Path,
@@ -657,6 +1287,11 @@ def main():
     parser.add_argument('--thinking', choices=['default', 'on', 'off'],
                         default='default')
     args = parser.parse_args()
+    serving_metadata = None
+    if args.serving_metadata:
+        serving_metadata = json.loads(args.serving_metadata.read_text())
+        if not isinstance(serving_metadata, dict):
+            parser.error('--serving-metadata must contain a JSON object')
     if args.max_steps < 0 or args.max_output_tokens <= 0 or args.seconds <= 0:
         parser.error('--max-steps must be non-negative; --max-output-tokens and --seconds must be positive')
     if args.command == 'list':
@@ -719,6 +1354,7 @@ def main():
                 result['task_sha256'] = hashlib.sha256(
                     json.dumps(spec, sort_keys=True).encode()).hexdigest()
                 result['runtime_image_id'] = runtime.image_id(args.image)
+                result['serving'] = serving_metadata
                 result['request'] = {'agent_model': agent_model,
                                      'agent_variant': args.reasoning_effort,
                                      'task_seconds': args.seconds,
@@ -729,7 +1365,7 @@ def main():
                                       args.image, args.endpoint, args.auth_file,
                                       args.max_steps, args.seconds, args.reasoning_effort,
                                       args.thinking, args.max_output_tokens,
-                                      args.api_key_env)
+                                      args.api_key_env, serving_metadata)
             result['run_group'] = run_group
             filename = args.output / f'{model.replace("/", "-")}-{task_id}.json'
             filename.write_text(json.dumps(result, indent=2, ensure_ascii=False))

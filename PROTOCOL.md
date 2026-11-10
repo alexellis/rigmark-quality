@@ -1,10 +1,12 @@
 # Experimental quality protocol
 
-Protocol 0.8 uses thirteen fixed tasks. It is a diagnostic suite, not a
+Protocol 1.0 uses nineteen fixed tasks. It is a diagnostic suite, not a
 quality score. A receipt is one model attempt on one task. It records the
 requested and observed model, the complete request settings, task/suite
 hashes, runtime image, elapsed time, tool calls, file diffs, independent
-checks, and the reason the governor stopped the attempt.
+checks, and the reason the governor stopped the attempt. Published example
+JSON summaries omit tool calls, conversation content, and file diffs; their
+cards describe only fields those summaries contain.
 
 The default limit is 1,800 seconds per task. Typed-tool tasks request 32,768
 output tokens per response and have no default model-turn cap; an explicit
@@ -25,11 +27,46 @@ training data. It reports file artefact correctness separately from whether
 the conversation reached a final answer.
 A task can have correct code and an unfinished conversation.
 
-Twelve tasks use the restricted typed-tool harness. Coding checks run in an
+Eighteen tasks use the restricted typed-tool harness. Coding checks run in an
 offline Docker container with a read-only root, resource limits, and no
-Docker socket. That interface is a significant harness choice; its results
+Docker socket. Each Docker command's captured output is capped at 4 MiB.
+The task deadline also bounds model requests, tool execution, and final
+grading; container cleanup may add a few seconds after a timeout.
+That interface is a significant harness choice; its results
 are not ordinary terminal-agent results. The document and refusal tasks
 remain exploratory. The refusal check is a smoke test, not a cyber benchmark.
+The agent's `run_tests` works on a disposable copy, so test-time writes cannot
+alter protected workspace files. Withheld Go, C, and SQLite checks are
+compiled before their source is removed from the execution copy. The SQLite
+migration fixture runs candidate code in a child process and checks database
+state in its parent; terminal output from the child is discarded. The parent
+also requires terminal test evidence from its own checks. These measures
+detect premature exits and accidental fixture tampering. They are not a
+hardened defence against code deliberately written to reverse engineer the
+judge.
+
+Two SQLite tasks extend that harness. `sqlite-migration` checks preservation
+of all invoice lines, safe reruns, rollback on metadata conflicts, and
+preservation of caller-owned transactions. `sqlite-report` checks exact
+results on fresh data and whether SQLite uses explicit indexes for filtered
+orders and joined lines. The latter is a query-design diagnostic, not a
+cross-machine timing benchmark.
+
+Four harder diagnostics extend the harness. `go-shutdown-deadlock` grades a
+forced shutdown interleaving and preserves accepted work. The paired
+`go-concurrency-review` asks for a concrete finding in one dispatcher and no
+finding in its safe twin; its text-based causal-evidence check is a review
+calibration aid, not an executable proof. `go-export-boundary` checks that a
+cross-account request fails while legitimate owners retain access.
+`c-frame-bounds` checks malformed inputs with AddressSanitizer and UBSan.
+For the three Go/C and two SQLite repair tasks, the candidate's own regression
+test must pass with its fix and fail when the original broken source is
+restored. A compile or import error on the restored source does not count as a
+reproducer.
+The review task remains experimental until its calibration is supported by
+multiple independent model runs.
+The review receipt records plain versus fenced JSON separately from the
+substantive finding, so a formatting slip does not erase a correct diagnosis.
 
 `arkade-add` is a native-agent task. By default, a disposable Docker container
 runs OpenCode against the entire pinned arkade checkout with its real
@@ -59,4 +96,8 @@ reasoning setting, limits, and harness match. Docker and Slicer native-agent
 receipts identify their distinct harnesses. Repeat tasks from fresh
 workspaces. Preserve failures and timeouts rather than excluding them from a
 report. Describe the checkpoint, quantisation, serving engine, and hardware
-alongside public results, or link a RigMark bench receipt.
+alongside public results, or link a RigMark bench receipt. Typed-tool receipts
+use `harness: typed-tools-v1`; `--serving-metadata` attaches structured stack
+details. A missing engine version is recorded as unknown, not inferred from
+the model name. `stop_reason: normal` denotes a completed attempt with no
+recorded failure.

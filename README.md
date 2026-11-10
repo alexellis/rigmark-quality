@@ -15,7 +15,7 @@ this README and any `AGENTS.md`, adapt the commands to your environment, run the
 checks, and investigate errors from their output. Review machine-specific
 changes before applying them.
 
-This is **experimental**. Its thirteen tasks are a diagnostic starting point,
+This is **experimental**. Its nineteen tasks are a diagnostic starting point,
 not a complete quality test of a model, a quantisation, or an agent product.
 There is no overall ranking. The main [RigMark](https://github.com/alexellis/rigmark)
 repository remains the serving benchmark for prose, code, prefill, and
@@ -29,7 +29,7 @@ free model, then compare *task receipts* under the same limits. Free-model
 availability, tool support, and provider routing can change; record the exact
 model and endpoint used. Nothing here requires NVIDIA hardware.
 
-## The 13 tasks
+## The 19 tasks
 
 Each row is a separate attempt in a fresh workspace. Omit `--task` to run the
 whole suite, or select one task by its ID. The checks in the last column run
@@ -41,7 +41,13 @@ after the model finishes; it cannot see them while working.
 | Code | `node-idempotency` | Make a Node store handle retries, conflicts, and invalid input. | Stable IDs, independent stores, no unwanted mutation, and added tests. |
 | Code | `go-worker-pool` | Repair a bounded worker pool across multiple Go files. | Parallelism limit, cancellation, result delivery, and race safety. |
 | Code | `go-transfer-ledger` | Make transfers atomic and idempotent under concurrent calls. | Exactly-once effects, balances, conflicts, cancellation, and races. |
+| Code | `go-shutdown-deadlock` | Diagnose a hanging Go service shutdown from a symptom, then fix it. | Concurrent closers finish, accepted jobs drain, and the worker stops. |
+| Review | `go-concurrency-review` | Trace concurrent submissions and shutdown across two Go worker implementations. | A send-on-closed-channel finding, no false positive on the safe variant, and a causal interleaving. |
+| Cyber | `go-export-boundary` | Find and fix a cross-account export disclosure. | An unauthorised request fails, while both owners retain access. |
+| Cyber | `c-frame-bounds` | Repair a malformed length-prefixed C frame decoder. | Bounds, invalid-input invariants, and AddressSanitizer and UBSan. |
 | Native agent | `arkade-add` | Add real `shfmt` support to a pinned arkade checkout, following its `AGENTS.md`. | Release URLs, the agent's Go test, formatting, and the README entry. |
+| Database | `sqlite-migration` | Split a denormalised invoice table without losing lines or changing unrelated records. | Exact data preservation, constraints, repeatability, conflict rollback, and caller-owned transactions. |
+| Database | `sqlite-report` | Write a paid-order revenue query and tune an initially unindexed, repetitive dataset. | Exact rankings on fresh seeds and indexed lookups in SQLite's query plan. |
 | Tools | `stock-transfer` | Recover from a simulated stock revision conflict. | One correct transfer, a fresh read before retry, and reported counts. |
 | Tools | `payment-recovery` | Resolve ambiguous payment timeouts for two fictional invoices. | Lookup before retry, exactly-once ledger effects, and final balances. |
 | Tools | `ticket-routing` | Update one tenant's ticket despite an injected instruction. | Correct ticket and priority; every other ticket stays unchanged. |
@@ -50,6 +56,12 @@ after the model finishes; it cannot see them while working.
 | Evidence | `long-context-retrieval` | Find the approved record among 360 distracting entries. | Correct record and values in strict JSON. |
 | Exploratory | `statement-redact` | Remove human sender names from a synthetic bank-statement PDF. | Names absent from the PDF, with dates, amounts, balances, and other text retained. |
 | Exploratory | `security-boundary` | Help with defensive telemetry while refusing credential theft. | Both decisions and a lightweight content check; this is a smoke test. |
+
+For the two SQLite and three new Go and C repair tasks, the agent's regression
+test must pass with its fix and fail when the original broken source is
+restored. The review task
+records whether its answer was plain JSON or wrapped in Markdown separately
+from whether it identified the real defect and cleared the sound variant.
 
 The arkade task uses [shfmt](https://github.com/mvdan/sh), a real tool, and a
 checkout from before arkade added it. The agent sees the entire repository and
@@ -71,6 +83,13 @@ stronger claims.
 The other coding tasks still expose typed file/edit/test tools. Do not treat
 their results as ordinary OpenCode or terminal-agent results.
 
+The SQLite tasks also use the typed-tool harness and Python's built-in
+`sqlite3` library. The report judge seeds 50,000 orders with 100,000 lines;
+it checks correctness and the chosen indexes through `EXPLAIN QUERY PLAN`,
+not a machine-dependent elapsed-time target. The migration judge checks
+multi-line invoices and whether a failed migration leaves the original data
+and schema intact.
+
 ## Try it
 
 Each [release](https://github.com/alexellis/rigmark-quality/releases) will
@@ -80,7 +99,7 @@ See [RELEASING.md](RELEASING.md) for the release process.
 
 Use a host with Docker Community Edition and OpenCode configured for the
 model you want to test, including credentials if its provider requires them.
-All 13 tasks run without Slicer. The native arkade
+All 19 tasks run without Slicer. The native arkade
 agent runs in a disposable Docker container with network access for its model
 and release lookups. It receives only the selected OpenCode provider settings
 and credentials in a temporary home; it cannot access the host's Docker socket
@@ -107,7 +126,7 @@ calling a model. It can take several minutes and prints JSON diagnostics,
 not a RigMark Quality card or model receipt. Run it once after setting up the
 test image; a successful exit means the harness controls passed.
 
-**Run the full 13-task suite** by leaving out `--task`. Twelve tasks use fresh
+**Run the full 19-task suite** by leaving out `--task`. Eighteen tasks use fresh
 typed-tool workspaces; `arkade-add` launches a fresh OpenCode container. The run
 prints one JSON status line per task; `report` combines that run's receipts
 into a shareable ASCII card. Keep each full run in a new output directory so
@@ -134,7 +153,7 @@ contender for its primary and small model. The corresponding full run is:
 
 To try **one smoke task only**, add `--task python-expiry` to a `run` command
 and use a separate output directory. A pass on that task is not a full-suite
-result. The other twelve tasks use OpenAI-compatible chat completions and
+result. The other eighteen tasks use OpenAI-compatible chat completions and
 typed tools. `arkade-add` uses OpenCode in its normal terminal-enabled agent
 mode. When using `--endpoint` for a full run, configure that endpoint in
 OpenCode and provide `--agent-model`; the native task cannot infer OpenCode
@@ -157,6 +176,12 @@ the typed-tool token cap.
 | Local vLLM, SGLang, llama.cpp, or similar | `--endpoint http://HOST:PORT/v1 --auth-file none` |
 | OpenCode Zen or OpenRouter | `--endpoint URL --api-key-env MODEL_API_KEY` |
 | [Toilgate](https://toilgate.o6s.io/) | `--toilgate`, after signing in locally |
+
+For a shareable receipt, pass `--serving-metadata stack.json` with a JSON
+object identifying the checkpoint, quantisation, engine and version, gateway,
+and hardware. The receipt records `harness: typed-tools-v1` for these tasks.
+Omitting serving metadata leaves that comparison dimension unknown; an
+endpoint URL alone does not identify the engine or checkpoint.
 
 For an optional single-task smoke run against a bearer-key endpoint, pass the
 **name** of an environment variable, never the key itself:
@@ -190,6 +215,8 @@ By default, `report` prints a compact ASCII card per model and suite hash.
 Use `--format json` for a machine-readable diagnostic matrix. Each task JSON
 receipt records the requested and observed model, request limits, suite and
 task hashes, runtime image, checks, elapsed time, tool trace, and stop reason.
+Published example JSON summaries omit the tool trace, conversation content,
+and file diffs; their cards point only to fields they include.
 The card deliberately separates **artefact passed** from **conversation
 finished**: correct code followed by a reasoning loop is a distinct outcome.
 Coding artefacts must pass both the final public tests and withheld checks;
@@ -204,7 +231,7 @@ On every push to `master` and pull request, the [check workflow](.github/workflo
 clones the pinned arkade revision, builds both Docker images, checks the
 OpenCode and Go versions, compiles the Python code, runs the governor unit
 tests, and runs `selftest`. That control
-run checks the reference and deliberately broken cases for all 13 tasks,
+run checks the reference and deliberately broken cases for all 19 tasks,
 including the native arkade artefact grader. It does not launch OpenCode.
 CI also regenerates every committed receipt card and checks that it matches
 the JSON summaries. It does not call a model endpoint or measure model quality.
@@ -212,6 +239,10 @@ The separate [release-assets workflow](.github/workflows/release-assets.yml)
 packages the CLI and checksum only when a release is published.
 
 ## Receipts
+
+The [10 November protocol 1.0 pilot](examples/receipts/2026-11-10-protocol-1.0-pilot/README.md)
+covers the six new tasks on three serving stacks, with one attempt per model
+and task. It is a selected pilot, not a complete 19-task run or a ranking.
 
 The [13 October protocol 0.6 cards](examples/receipts/2026-10-13-protocol-06/cards.txt)
 and [public JSON summaries](examples/receipts/2026-10-13-protocol-06/) record
