@@ -98,6 +98,11 @@ def capture(command, timeout=60, max_output_bytes=4 * 1024 * 1024):
             tail.extend(chunk)
             if len(tail) > 32768:
                 del tail[:-32768]
+    if not timed_out and not output_limited and p.poll() is None:
+        try:
+            p.wait(timeout=max(0, deadline - time.monotonic()))
+        except subprocess.TimeoutExpired:
+            timed_out = True
     if timed_out or output_limited:
         try:
             os.killpg(p.pid, signal.SIGKILL)

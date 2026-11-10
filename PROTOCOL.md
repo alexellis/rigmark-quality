@@ -94,4 +94,8 @@ reasoning setting, limits, and harness match. Docker and Slicer native-agent
 receipts identify their distinct harnesses. Repeat tasks from fresh
 workspaces. Preserve failures and timeouts rather than excluding them from a
 report. Describe the checkpoint, quantisation, serving engine, and hardware
-alongside public results, or link a RigMark bench receipt.
+alongside public results, or link a RigMark bench receipt. Typed-tool receipts
+use `harness: typed-tools-v1`; `--serving-metadata` attaches structured stack
+details. A missing engine version is recorded as unknown, not inferred from
+the model name. `stop_reason: normal` denotes a completed attempt with no
+recorded failure.

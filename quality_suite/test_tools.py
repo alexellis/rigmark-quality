@@ -105,6 +105,13 @@ class PublicTestIsolationTests(unittest.TestCase):
         self.assertNotEqual(result['exit_code'], 0)
         self.assertLess(len(result['output']), 70000)
 
+    def test_closed_output_stream_does_not_evade_deadline(self):
+        result = runtime.capture(['python3', '-c',
+                                  'import os,time; os.close(1); os.close(2); '
+                                  'time.sleep(2)'], timeout=0.1)
+        self.assertTrue(result['timeout'])
+        self.assertNotEqual(result['exit_code'], 0)
+
 
 class ReviewGradeTests(unittest.TestCase):
     def review_calls(self, directory, partial=None):
@@ -183,6 +190,13 @@ class ReviewGradeTests(unittest.TestCase):
         for kind in ('no_send_on_closed_channel', 'send-on-closed-channel race'):
             with self.subTest(kind=kind):
                 self.assertFalse(advanced_evaluators.review_cause(kind, evidence))
+
+    def test_flag_protection_does_not_negate_channel_race(self):
+        evidence = ('The mutex prevents races on the flag, but Submit unlocks; '
+                    'Close closes jobs; Submit then sends on the closed channel '
+                    'and panics.')
+        self.assertTrue(advanced_evaluators.review_cause(
+            'send-on-closed-channel race without lock coverage', evidence))
 
     def test_mutex_does_not_cover_send_is_valid_evidence(self):
         evidence = ('Submit unlocks after checking the closed flag. Close '

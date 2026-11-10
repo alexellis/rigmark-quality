@@ -143,6 +143,10 @@ class Acceptance(unittest.TestCase):
                              -25 if part == 3 else invoice * part))
         rows.append((9001, 'INV-special', 'a+b@example.test',
                      '2024-02-29', 0, 'ZERO', 1, 0))
+        rows.extend([
+            (9002, 'INV-case', 'upper@example.test', '2026-10-03', 11, 'CASE', 1, 11),
+            (9003, 'inv-case', 'lower@example.test', '2026-10-04', 12, 'CASE', 1, 12),
+        ])
         conn.executemany('INSERT INTO invoice_lines VALUES (?,?,?,?,?,?,?,?)', rows)
         conn.execute("INSERT INTO audit_log VALUES (4, 'retain exactly')")
         conn.execute('CREATE UNIQUE INDEX audit_note_unique ON audit_log(note)')
@@ -161,7 +165,7 @@ class Acceptance(unittest.TestCase):
         require_columns(conn, 'invoice_items', ITEM_COLUMNS)
         self.assertEqual(unrelated_state(conn), unrelated_before)
         self.assertEqual(conn.execute('PRAGMA foreign_key_check').fetchall(), [])
-        self.assertEqual(conn.execute('SELECT COUNT(*) FROM invoices').fetchone()[0], 51)
+        self.assertEqual(conn.execute('SELECT COUNT(*) FROM invoices').fetchone()[0], 53)
         self.assertEqual(conn.execute('SELECT line_id, invoice_id, sku, quantity, unit_cents '
                                       'FROM invoice_items ORDER BY line_id').fetchall(),
                          [(r[0], r[1], r[5], r[6], r[7]) for r in sorted(rows)])

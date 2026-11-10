@@ -177,6 +177,12 @@ the typed-tool token cap.
 | OpenCode Zen or OpenRouter | `--endpoint URL --api-key-env MODEL_API_KEY` |
 | [Toilgate](https://toilgate.o6s.io/) | `--toilgate`, after signing in locally |
 
+For a shareable receipt, pass `--serving-metadata stack.json` with a JSON
+object identifying the checkpoint, quantisation, engine and version, gateway,
+and hardware. The receipt records `harness: typed-tools-v1` for these tasks.
+Omitting serving metadata leaves that comparison dimension unknown; an
+endpoint URL alone does not identify the engine or checkpoint.
+
 For an optional single-task smoke run against a bearer-key endpoint, pass the
 **name** of an environment variable, never the key itself:
 

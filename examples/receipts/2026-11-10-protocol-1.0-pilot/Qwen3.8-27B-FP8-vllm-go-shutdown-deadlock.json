@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "41f3094dc0f964b396b7ad1162b26a17a92038c2d57c889ee56c807ce033d97b",
+  "suite_sha256": "315261970fe5e089827945d45e191f736841fd0c019a754292f0c9a346c5bd1b",
   "task_sha256": "184bbff65bb0bead31d482eeb957ee203903683ae2fb4251fe10617985a39eba",
   "request": {
     "temperature": 0,
@@ -73,9 +73,19 @@
   "regrade": {
     "method": "offline_hidden_judge",
     "source_suite_sha256": "f2409820d9f11a35b5c1fd258c295218d0fa0420ecf2e1f19a6d5bc969093aac",
-    "regraded_at": "2026-11-10T20:36:51.038344+00:00",
+    "regraded_at": "2026-11-10T20:55:10.214608+00:00",
     "model_inference_repeated": false
   },
   "receipt_kind": "public_summary",
-  "source_note": "Model inference on 10 November 2026; recorded final workspaces were rebuilt from hashed diffs and regraded offline with revised hidden checks. No new model inference was made for this judge revision. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "Model inference on 10 November 2026; recorded final workspaces were rebuilt from hashed diffs and regraded offline with revised hidden checks. No new model inference was made for this judge revision. Conversation, tool calls, file diffs, and endpoint details omitted.",
+  "harness": "typed-tools-v1",
+  "serving": {
+    "gateway": "Toilgate",
+    "engine": "vLLM",
+    "engine_version": null,
+    "checkpoint": "Qwen3.8-27B-FP8",
+    "quantisation": "FP8",
+    "hardware": "RTX PRO 6000 Blackwell"
+  },
+  "stop_reason": "normal"
 }

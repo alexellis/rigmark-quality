@@ -45,6 +45,16 @@ class Acceptance(unittest.TestCase):
         conn.execute('PRAGMA automatic_index = OFF')
         plan_rows = [row[3] for row in conn.execute(
             'EXPLAIN QUERY PLAN ' + query, {'since': since})]
+        source_aliases = {'orders', 'order_lines'}
+        for table, alias in re.findall(
+                r'\b(?:FROM|JOIN)\s+(orders|order_lines)\s+(?:AS\s+)?([A-Za-z_]\w*)',
+                query, re.I):
+            source_aliases.add(alias.casefold())
+        scans = [detail for detail in plan_rows
+                 if (match := re.search(r'\bSCAN\s+(?:TABLE\s+)?([A-Za-z_]\w*)',
+                                        detail, re.I))
+                 and match.group(1).casefold() in source_aliases]
+        self.assertFalse(scans, 'report scans a source table: ' + repr(scans))
         lookups = []
         for detail in plan_rows:
             match = re.search(r'\bSEARCH\b.*\bUSING (?:COVERING )?INDEX (.+?)\s*\(([^()]*)\)',

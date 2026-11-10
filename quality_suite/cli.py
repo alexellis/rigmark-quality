@@ -396,7 +396,7 @@ print(json.dumps(judge("redacted.pdf", rows)))
 
 def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
              max_steps, seconds, reasoning_effort, thinking,
-             max_output_tokens=32768, api_key_env=None):
+             max_output_tokens=32768, api_key_env=None, serving_metadata=None):
     if task_id == 'arkade-add':
         raise ValueError('arkade-add requires the native OpenCode runner')
     active_suite_hash = suite_hash()
@@ -524,6 +524,8 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
         details = item.get('completion_tokens_details') or {}
         usage['reasoning_tokens'] += details.get('reasoning_tokens') or 0
     result = {'task': task_id, 'category': tasks.TASKS[task_id]['category'],
+              'harness': 'typed-tools-v1',
+              'serving': serving_metadata,
               'interpretation': 'diagnostic_only',
               'task_status': ('exploratory' if task_id == 'statement-redact'
                               else 'experimental'),
@@ -550,7 +552,8 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
               'conversation_finished': conversation_finished,
               'governor_notices': guard.notices,
               'passed': all(checks.values()) and clean_models and failure is None,
-              'failure': failure, 'answer': answer,
+              'failure': failure, 'stop_reason': failure or 'normal',
+              'answer': answer,
               'review_output_format': (advanced_evaluators.review_format(answer)
                                        if task_id == 'go-concurrency-review' else None),
               'calls': box.calls, 'events': event_log, 'acceptance': acceptance,
@@ -626,6 +629,20 @@ def selftest(root, arkade_root, image):
                 outcomes[task_id + '-removed-test'] = {
                     'reference': {'baseline_preserved': good_checks['baseline_test_preserved']},
                     'broken': {'baseline_preserved': removed_checks['baseline_test_preserved']}}
+            if task_id == 'go-shutdown-deadlock':
+                discarded = parent / 'discarded-accepted-jobs'
+                shutil.copytree(good, discarded)
+                source = discarded / 'service.go'
+                contents = source.read_text()
+                old = ('\tselect {\n\tcase s.jobs <- job:\n\t\treturn true\n'
+                       '\tdefault:\n\t\treturn false\n\t}')
+                assert old in contents
+                source.write_text(contents.replace(old, '\ts.processed++\n\treturn true', 1))
+                discarded_checks, _ = grade_coding(task_id, discarded, image, arkade_root)
+                outcomes['go-shutdown-discarded-jobs'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_tests': discarded_checks['public_tests']},
+                    'broken': {'acceptance': discarded_checks['acceptance']}}
             if task_id in ('sqlite-migration', 'sqlite-report'):
                 test_file = broken / ('test_migration.py' if task_id == 'sqlite-migration'
                                       else 'test_report.py')
@@ -712,6 +729,17 @@ def selftest(root, arkade_root, image):
                 outcomes['sqlite-migration-weak-schema'] = {
                     'reference': {'acceptance': good_checks['acceptance']},
                     'broken': {'acceptance': weak_schema_checks['acceptance']}}
+                casefold = parent / 'casefold-primary-key'
+                shutil.copytree(good, casefold)
+                source = casefold / 'migration.py'
+                source.write_text(source.read_text().replace(
+                    'invoice_id TEXT PRIMARY KEY NOT NULL, ',
+                    'invoice_id TEXT PRIMARY KEY NOT NULL COLLATE NOCASE, ', 1))
+                casefold_checks, _ = grade_coding(task_id, casefold, image, arkade_root)
+                outcomes['sqlite-migration-casefold-key'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_tests': casefold_checks['public_tests']},
+                    'broken': {'acceptance': casefold_checks['acceptance']}}
                 rerun = parent / 'destructive-rerun'
                 shutil.copytree(good, rerun)
                 source = rerun / 'migration.py'
@@ -724,6 +752,30 @@ def selftest(root, arkade_root, image):
                     'reference': {'acceptance': good_checks['acceptance']},
                     'broken': {'acceptance': rerun_checks['acceptance']}}
             if task_id == 'go-export-boundary':
+                missing_id = parent / 'missing-owner-id'
+                shutil.copytree(good, missing_id)
+                source = missing_id / 'server.go'
+                source.write_text(source.read_text().replace('json:"id"', 'json:"-"', 1))
+                id_checks, _ = grade_coding(task_id, missing_id, image, arkade_root)
+                outcomes['go-export-missing-id'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_tests': id_checks['public_tests']},
+                    'broken': {'acceptance': id_checks['acceptance']}}
+                metadata = parent / 'forbidden-metadata'
+                shutil.copytree(good, metadata)
+                source = metadata / 'server.go'
+                contents = source.read_text()
+                old = ('if !ok || item.Owner != user {\n'
+                       '\t\thttp.NotFound(w, r)\n\t\treturn\n\t}')
+                assert old in contents
+                source.write_text(contents.replace(
+                    old, old.replace('http.NotFound(w, r)',
+                                     'http.Error(w, item.ID, http.StatusNotFound)'), 1))
+                metadata_checks, _ = grade_coding(task_id, metadata, image, arkade_root)
+                outcomes['go-export-forbidden-metadata'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_tests': metadata_checks['public_tests']},
+                    'broken': {'acceptance': metadata_checks['acceptance']}}
                 leaked = parent / 'unauthenticated-leak'
                 shutil.copytree(good, leaked)
                 source = leaked / 'server.go'
@@ -813,6 +865,25 @@ def selftest(root, arkade_root, image):
                 outcomes['sqlite-report-weak-index'] = {
                     'reference': {'valid_index': good_checks['acceptance']},
                     'broken': {'weak_index': weak_checks['acceptance']}}
+                noop = parent / 'indexed-noop-probes'
+                shutil.copytree(good, noop)
+                query = noop / 'report.sql'
+                contents = query.read_text()
+                contents = contents.replace('FROM orders AS o\n',
+                                            'FROM orders AS o NOT INDEXED\n')
+                contents = contents.replace('JOIN order_lines AS li ON li.order_id = o.id\n',
+                                            'JOIN order_lines AS li NOT INDEXED ON li.order_id = o.id\n')
+                contents = contents.replace(
+                    "WHERE o.status = 'paid' AND o.ordered_on >= :since\n",
+                    "WHERE o.status = 'paid' AND o.ordered_on >= :since\n"
+                    "AND EXISTS (SELECT 1 FROM orders AS probe INDEXED BY orders_status_date_customer WHERE probe.status = 'paid' AND probe.ordered_on >= :since)\n"
+                    "AND EXISTS (SELECT 1 FROM order_lines AS probe_line INDEXED BY order_lines_order_id WHERE probe_line.order_id = li.order_id)\n")
+                query.write_text(contents)
+                noop_checks, _ = grade_coding(task_id, noop, image, arkade_root)
+                outcomes['sqlite-report-indexed-noop-probes'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_tests': noop_checks['public_tests']},
+                    'broken': {'acceptance': noop_checks['acceptance']}}
                 exclusive = parent / 'exclusive-date'
                 shutil.copytree(good, exclusive)
                 query = exclusive / 'report.sql'
@@ -1083,7 +1154,7 @@ def ascii_card(key, receipts):
         if finished is None:
             finished = receipt.get('failure') is None
         mark = lambda value: 'yes' if value else 'no'
-        stop = receipt.get('failure') or 'normal'
+        stop = receipt.get('stop_reason') or receipt.get('failure') or 'normal'
         stop = textwrap.shorten(str(stop), width=17, placeholder='…')
         row(f"{receipt['task'][:27]:27} {mark(artefact):9} "
             f"{mark(finished):9} {receipt.get('elapsed_seconds', 0):>6.1f}s {stop}")
@@ -1145,6 +1216,8 @@ def main():
                         help='Optional Toilgate OAuth file; default: no authentication')
     parser.add_argument('--toilgate', action='store_true',
                         help='Use the locally signed-in Toilgate account')
+    parser.add_argument('--serving-metadata', type=Path,
+                        help='JSON object identifying checkpoint, quantisation, engine, and hardware')
     parser.add_argument('--agent-model',
                         help='OpenCode provider/model for the native arkade task; with --toilgate, defaults to toilgate/MODEL_ID')
     parser.add_argument('--agent-config-file', type=Path,
@@ -1166,6 +1239,11 @@ def main():
     parser.add_argument('--thinking', choices=['default', 'on', 'off'],
                         default='default')
     args = parser.parse_args()
+    serving_metadata = None
+    if args.serving_metadata:
+        serving_metadata = json.loads(args.serving_metadata.read_text())
+        if not isinstance(serving_metadata, dict):
+            parser.error('--serving-metadata must contain a JSON object')
     if args.max_steps < 0 or args.max_output_tokens <= 0 or args.seconds <= 0:
         parser.error('--max-steps must be non-negative; --max-output-tokens and --seconds must be positive')
     if args.command == 'list':
@@ -1228,6 +1306,7 @@ def main():
                 result['task_sha256'] = hashlib.sha256(
                     json.dumps(spec, sort_keys=True).encode()).hexdigest()
                 result['runtime_image_id'] = runtime.image_id(args.image)
+                result['serving'] = serving_metadata
                 result['request'] = {'agent_model': agent_model,
                                      'agent_variant': args.reasoning_effort,
                                      'task_seconds': args.seconds,
@@ -1238,7 +1317,7 @@ def main():
                                       args.image, args.endpoint, args.auth_file,
                                       args.max_steps, args.seconds, args.reasoning_effort,
                                       args.thinking, args.max_output_tokens,
-                                      args.api_key_env)
+                                      args.api_key_env, serving_metadata)
             result['run_group'] = run_group
             filename = args.output / f'{model.replace("/", "-")}-{task_id}.json'
             filename.write_text(json.dumps(result, indent=2, ensure_ascii=False))

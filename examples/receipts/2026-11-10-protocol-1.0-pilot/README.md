@@ -16,7 +16,7 @@ conversation on all six tasks in this pilot.
 | C frame bounds | Pass | Pass | Pass |
 
 All receipts use suite SHA-256
-`41f3094dc0f964b396b7ad1162b26a17a92038c2d57c889ee56c807ce033d97b`,
+`315261970fe5e089827945d45e191f736841fd0c019a754292f0c9a346c5bd1b`,
 temperature 0, top-p 1, seed 20261011, requested low reasoning, provider
 default thinking, a 32,768-token response cap, no turn cap, and a 1,800-second
 task deadline. All six tasks were run for each model on 10 November. Their
@@ -43,10 +43,14 @@ GLM 5.3 Flash NVFP4 ran through Toilgate on four DGX Sparks. DeepSeek V4.1
 Flash 1017 used Mia's 2.9 bpw EXL3 TensorFold recipe directly on two DGX
 Sparks. Qwen 3.8 27B FP8 ran through Toilgate and vLLM on an RTX PRO 6000
 Blackwell. These serving stacks and hardware differ, so elapsed times are
-diagnostic observations, not a controlled speed comparison.
+diagnostic observations, not a controlled speed comparison. Engine versions
+were not captured in this pilot and are explicitly `null` in the per-task
+`serving` records; matching these summaries alone cannot establish an
+engine-version-controlled comparison.
 
 The public JSON files contain request settings, observed model identities,
-checks, usage, and stop states. Conversation content, tool calls, file diffs,
+the typed-tool harness, serving-stack labels, checks, usage, and explicit
+stop reasons. Conversation content, tool calls, file diffs,
 and endpoint details remain in private source receipts. The public cards point
 readers to the checks and stop state available in these summaries. One pass
 per model does not establish reliability; this pilot did not separate the

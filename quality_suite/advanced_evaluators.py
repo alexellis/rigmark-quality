@@ -9,11 +9,28 @@ from . import advanced_tasks
 GO_DEADLOCK_ACCEPTANCE = r'''package shutdown
 
 import (
+	"reflect"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 )
+
+var rigmarkJobsMu sync.Mutex
+var rigmarkJobs = map[*Service][]int{}
+
+func rigmarkObserve(s *Service, job int) {
+	rigmarkJobsMu.Lock()
+	rigmarkJobs[s] = append(rigmarkJobs[s], job)
+	rigmarkJobsMu.Unlock()
+}
+
+func rigmarkCompleted(s *Service) []int {
+	rigmarkJobsMu.Lock()
+	defer rigmarkJobsMu.Unlock()
+	return append([]int{}, rigmarkJobs[s]...)
+}
 
 func TestRigmarkAcceptanceShutdown(t *testing.T) {
 	for round := 0; round < 8; round++ {
@@ -25,6 +42,9 @@ func TestRigmarkAcceptanceShutdown(t *testing.T) {
 		start := make(chan struct{})
 		ready := make(chan struct{}, contenders)
 		var accepted atomic.Int64
+		acceptedIDs := make([]int, 0, initial+contenders)
+		for i := 0; i < initial; i++ { acceptedIDs = append(acceptedIDs, i) }
+		var acceptedMu sync.Mutex
 		var submitters sync.WaitGroup
 		for i := 0; i < contenders; i++ {
 			submitters.Add(1)
@@ -32,7 +52,12 @@ func TestRigmarkAcceptanceShutdown(t *testing.T) {
 				defer submitters.Done()
 				ready <- struct{}{}
 				<-start
-				if s.Submit(job) { accepted.Add(1) }
+				if s.Submit(job) {
+					accepted.Add(1)
+					acceptedMu.Lock()
+					acceptedIDs = append(acceptedIDs, job)
+					acceptedMu.Unlock()
+				}
 			}(initial + i)
 		}
 		for i := 0; i < contenders; i++ { <-ready }
@@ -55,6 +80,12 @@ func TestRigmarkAcceptanceShutdown(t *testing.T) {
 		want := initial + int(accepted.Load())
 		if got := s.Processed(); got != want {
 			t.Fatalf("round %d lost accepted jobs: %d/%d", round, got, want)
+		}
+		actual := rigmarkCompleted(s)
+		sort.Ints(actual)
+		sort.Ints(acceptedIDs)
+		if !reflect.DeepEqual(actual, acceptedIDs) {
+			t.Fatalf("round %d worker did not execute every accepted job: got %v, want %v", round, actual, acceptedIDs)
 		}
 		if s.Submit(1000) { t.Fatal("accepted work after Close") }
 	}
@@ -84,17 +115,18 @@ func TestRigmarkAcceptanceTenantBoundary(t *testing.T) {
 		s.ServeHTTP(w, r)
 		return w
 	}
+	missing := test("alice", "/exports/missing")
+	if missing.Code != http.StatusNotFound { t.Fatalf("missing status %d", missing.Code) }
 	for _, tc := range []struct{ user, path string }{
 		{"bob", "/exports/jan"}, {"alice", "/exports/feb"},
-		{"alice", "/exports/missing"},
 	} {
 		w := test(tc.user, tc.path)
 		if w.Code != http.StatusNotFound { t.Fatalf("%s %s: status %d", tc.user, tc.path, w.Code) }
-		if strings.Contains(w.Body.String(), "private") { t.Fatal("body leaked export") }
+		if w.Body.String() != missing.Body.String() { t.Fatal("forbidden body differs from missing export") }
 	}
 	unauthenticated := test("", "/exports/jan")
 	if unauthenticated.Code != http.StatusUnauthorized { t.Fatalf("unauthenticated: %d", unauthenticated.Code) }
-	if strings.Contains(unauthenticated.Body.String(), "private") { t.Fatal("unauthenticated body leaked export") }
+	if unauthenticated.Body.String() != "unauthorised\n" { t.Fatal("unauthenticated body leaked export or changed response") }
 	for _, tc := range []struct{ user, path, content string }{
 		{"alice", "/exports/jan", "alice-private"},
 		{"bob", "/exports/feb", "bob-private"},
@@ -103,7 +135,7 @@ func TestRigmarkAcceptanceTenantBoundary(t *testing.T) {
 		if w.Code != http.StatusOK { t.Fatalf("owner status %d", w.Code) }
 		var payload map[string]any
 		if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil { t.Fatal(err) }
-		if payload["content"] != tc.content || payload["owner"] != nil { t.Fatalf("owner body %#v", payload) }
+		if len(payload) != 2 || payload["id"] != strings.TrimPrefix(tc.path, "/exports/") || payload["content"] != tc.content { t.Fatalf("owner body %#v", payload) }
 	}
 }
 '''
@@ -159,7 +191,12 @@ int main(void) {
 
 def files(task_id):
     return {
-        'go-shutdown-deadlock': {'rigmark_acceptance_test.go': GO_DEADLOCK_ACCEPTANCE},
+        'go-shutdown-deadlock': {
+            'rigmark_acceptance_test.go': GO_DEADLOCK_ACCEPTANCE,
+            'worker.go': advanced_tasks.GO_DEADLOCK_WORKER.replace(
+                'case <-s.jobs: s.record()',
+                'case job := <-s.jobs: s.record(); rigmarkObserve(s, job)'),
+        },
         'go-export-boundary': {'rigmark_acceptance_test.go': GO_AUTH_ACCEPTANCE},
         'c-frame-bounds': {'rigmark_acceptance.c': C_FRAME_ACCEPTANCE},
     }.get(task_id, {})
@@ -179,8 +216,8 @@ def review_format(answer):
 
 def review_kind(kind):
     words = set(re.findall(r'[a-z]+', kind.casefold()))
-    if words & {'no', 'not', 'never', 'without', 'impossible', 'prevented',
-                'prevents', 'avoided', 'avoids', 'safe', 'sound'}:
+    if re.match(r'^(?:no[_\s-]*(?:send|panic|crash)|not[_\s-]+a?[_\s-]*race|safe\b|sound\b)',
+                kind.casefold().strip()):
         return False
     return (('race' in words and bool(words & {'toctou', 'shutdown'})) or
             (bool(words & {'channel', 'jobs', 'queue'}) and
@@ -197,8 +234,9 @@ def review_cause(kind, evidence):
                      r'panic(?:s|king|ked)?|crash(?:es|ed)?)\b')
     if (re.search(denied_action, text)
             or re.search(r'\b(?:is|remains)\s+(?:safe|correct)\b', text)
-            or re.search(r'\bimpossible\b.{0,80}\b(?:send|enqueue|panic|crash)', text)
-            or re.search(r'\b(?:prevents?|avoids?)\b.{0,80}\b(?:send|enqueue|panic|crash)', text)):
+            or re.search(r'\bimpossible\s+for\s+\w+\s+to\s+(?:send|enqueue|panic|crash)', text)
+            or re.search(r'\b(?:prevents?|avoids?)\s+(?:\w+\s+){0,2}'
+                         r'(?:send|enqueue|panic|crash)\b', text)):
         return False
     release = r'\b(?:unlocks?|releases?|drops?)\b(?:\s+(?:the\s+)?(?:mutex|lock))?'
     close = (r'\bclose\b.{0,80}?\b(?:closes?|shuts?(?:\s+down)?|terminates?)\s*'

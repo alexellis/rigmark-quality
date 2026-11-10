@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "41f3094dc0f964b396b7ad1162b26a17a92038c2d57c889ee56c807ce033d97b",
+  "suite_sha256": "315261970fe5e089827945d45e191f736841fd0c019a754292f0c9a346c5bd1b",
   "task_sha256": "c41678fb81384bd3baeb994f822104e1b502c7dcd66b83f440dff2c9fcab4658",
   "request": {
     "temperature": 0,
@@ -63,9 +63,19 @@
   "regrade": {
     "method": "offline_hidden_judge",
     "source_suite_sha256": "f2409820d9f11a35b5c1fd258c295218d0fa0420ecf2e1f19a6d5bc969093aac",
-    "regraded_at": "2026-11-10T20:33:34.242390+00:00",
+    "regraded_at": "2026-11-10T20:51:51.675362+00:00",
     "model_inference_repeated": false
   },
   "receipt_kind": "public_summary",
-  "source_note": "Model inference on 10 November 2026; recorded final workspaces were rebuilt from hashed diffs and regraded offline with revised hidden checks. No new model inference was made for this judge revision. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "Model inference on 10 November 2026; recorded final workspaces were rebuilt from hashed diffs and regraded offline with revised hidden checks. No new model inference was made for this judge revision. Conversation, tool calls, file diffs, and endpoint details omitted.",
+  "harness": "typed-tools-v1",
+  "serving": {
+    "gateway": "Toilgate",
+    "engine": "Atlas",
+    "engine_version": null,
+    "checkpoint": "nvidia/GLM-5.3-Flash-NVFP4",
+    "quantisation": "NVFP4",
+    "hardware": "4 DGX Sparks"
+  },
+  "stop_reason": "normal"
 }
