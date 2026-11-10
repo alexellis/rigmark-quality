@@ -127,6 +127,15 @@ func TestRigmarkAcceptanceTenantBoundary(t *testing.T) {
 	unauthenticated := test("", "/exports/jan")
 	if unauthenticated.Code != http.StatusUnauthorized { t.Fatalf("unauthenticated: %d", unauthenticated.Code) }
 	if unauthenticated.Body.String() != "unauthorised\n" { t.Fatal("unauthenticated body leaked export or changed response") }
+	for _, header := range []string{"X-User", "X-User-ID", "X-Owner"} {
+		r := httptest.NewRequest(http.MethodGet, "/exports/jan", nil)
+		r.Header.Set(header, "alice")
+		w := httptest.NewRecorder()
+		s.ServeHTTP(w, r)
+		if w.Code != http.StatusUnauthorized || w.Body.String() != unauthenticated.Body.String() {
+			t.Fatalf("spoofed %s supplied identity: %d %q", header, w.Code, w.Body.String())
+		}
+	}
 	for _, tc := range []struct{ user, path, content string }{
 		{"alice", "/exports/jan", "alice-private"},
 		{"bob", "/exports/feb", "bob-private"},
@@ -233,6 +242,8 @@ def review_cause(kind, evidence):
                      r'never|no)\s+(?:send(?:s|ing)?|enqueue(?:s|ing)?|'
                      r'panic(?:s|king|ked)?|crash(?:es|ed)?)\b')
     if (re.search(denied_action, text)
+            or re.search(r'\b(?:without|fails?\s+to|refuses?\s+to)\s+'
+                         r'(?:\w+\s+){0,2}(?:panic|crash|send|enqueue)\w*\b', text)
             or re.search(r'\b(?:is|remains)\s+(?:safe|correct)\b', text)
             or re.search(r'\bimpossible\s+for\s+\w+\s+to\s+(?:send|enqueue|panic|crash)', text)
             or re.search(r'\b(?:prevents?|avoids?)\s+(?:\w+\s+){0,2}'

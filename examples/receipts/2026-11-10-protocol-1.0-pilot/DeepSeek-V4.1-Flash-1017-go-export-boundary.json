@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "315261970fe5e089827945d45e191f736841fd0c019a754292f0c9a346c5bd1b",
+  "suite_sha256": "9f5e7a340d348b60c070fbb0ca6d10dc1b967bb477a519a7341df59bfac754b1",
   "task_sha256": "478587d442637200564452e213c1be6a9a4fc5f23f75dc1dece4bb55c16d098b",
   "request": {
     "temperature": 0,
@@ -57,7 +57,7 @@
   "checks": {
     "acceptance": true,
     "public_tests": true,
-    "baseline_test_preserved": true,
+    "baseline_contract": true,
     "regression_test_added": true,
     "regression_fails_on_original": true,
     "gofmt": true
@@ -69,8 +69,8 @@
   "review_output_format": null,
   "regrade": {
     "method": "offline_hidden_judge",
-    "source_suite_sha256": "f2409820d9f11a35b5c1fd258c295218d0fa0420ecf2e1f19a6d5bc969093aac",
-    "regraded_at": "2026-11-10T20:53:39.731047+00:00",
+    "source_suite_sha256": "f6134f4f8fe127c96f87167c932535a5fef69632be56d441e6986d518bc58059",
+    "regraded_at": "2026-11-10T21:31:47.211533+00:00",
     "model_inference_repeated": false
   },
   "receipt_kind": "public_summary",

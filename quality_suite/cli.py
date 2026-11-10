@@ -39,7 +39,7 @@ def suite_hash():
     return digest.hexdigest()
 
 
-def credentials(path):
+def credentials(path, timeout=30):
     data = json.loads(Path(path).read_text())
     auth = data['toilgate']
     if auth.get('type') != 'oauth':
@@ -51,7 +51,7 @@ def credentials(path):
     req = request.Request('https://toilgate.o6s.io/token', data=body,
                           headers={'Content-Type': 'application/x-www-form-urlencoded',
                                    'User-Agent': 'rigmark-quality/0.1'}, method='POST')
-    with request.urlopen(req, timeout=30) as response:
+    with request.urlopen(req, timeout=min(30, timeout)) as response:
         refreshed = json.load(response)
     auth.update({'access': refreshed['access_token'],
                  'refresh': refreshed.get('refresh_token', auth['refresh']),
@@ -66,6 +66,7 @@ def credentials(path):
 
 def completion(endpoint, model, messages, definitions, auth_file, timeout,
                reasoning_effort, thinking, max_output_tokens, api_key_env=None):
+    deadline = time.monotonic() + timeout
     payload = {'model': model, 'messages': messages, 'temperature': 0,
                'top_p': 1, 'seed': 20261011, 'max_tokens': max_output_tokens,
                'stream': False}
@@ -82,11 +83,11 @@ def completion(endpoint, model, messages, definitions, auth_file, timeout,
             raise ValueError(f'{api_key_env} is not set')
         headers['Authorization'] = 'Bearer ' + key
     elif auth_file != 'none':
-        headers['Authorization'] = 'Bearer ' + credentials(auth_file)
+        headers['Authorization'] = 'Bearer ' + credentials(auth_file, timeout)
     req = request.Request(endpoint.rstrip('/') + '/chat/completions',
                           data=json.dumps(payload).encode(), method='POST',
                           headers=headers)
-    with request.urlopen(req, timeout=timeout) as response:
+    with request.urlopen(req, timeout=bounded_timeout(timeout, deadline)) as response:
         return json.load(response)
 
 
@@ -100,23 +101,6 @@ def hidden_go_test_passed(result, task_id):
     expected = {'go-shutdown-deadlock': 'TestRigmarkAcceptanceShutdown',
                 'go-export-boundary': 'TestRigmarkAcceptanceTenantBoundary'}[task_id]
     return expected in result['terminal_events']['go_pass']
-
-
-def hidden_python_suite_passed(result, task_id):
-    expected = {
-        'sqlite-migration': ('test_caller_can_roll_back_migration',
-                             'test_conflicting_metadata_rolls_back_everything',
-                             'test_empty_legacy_schema_migrates',
-                             'test_every_line_and_other_table_survive'),
-        'sqlite-report': ('test_different_seed_and_date',
-                          'test_large_repetitive_seed'),
-    }[task_id]
-    module = task_id.replace('-', '_') + '_acceptance'
-    events = result['terminal_events']
-    return (all(f'{module}.Acceptance.{name}' in events['python_pass']
-                for name in expected)
-            and events['unittest_ran'] == len(expected)
-            and events['unittest_ok'])
 
 
 def python_test_methods(source, module):
@@ -154,14 +138,26 @@ def compact_test(source):
     return re.sub(r'[\s;]+', '', source)
 
 
-def grade_coding(task_id, workspace, image, arkade_root):
+def bounded_timeout(cap, deadline):
+    if deadline is None:
+        return cap
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError('task deadline exceeded before local evaluation')
+    return min(cap, remaining)
+
+
+def grade_coding(task_id, workspace, image, arkade_root, deadline=None):
+    def run_bounded(workspace, image, command, cap):
+        return runtime.run(workspace, image, command,
+                           bounded_timeout(cap, deadline))
     if task_id == 'statement-redact':
-        return grade_statement(workspace, image)
+        return grade_statement(workspace, image, deadline)
     with tempfile.TemporaryDirectory(prefix='rigmark-public-') as directory:
         public_candidate = Path(directory) / 'candidate'
         shutil.copytree(workspace, public_candidate,
                         ignore=shutil.ignore_patterns('.git'))
-        public = runtime.run(public_candidate, image,
+        public = run_bounded(public_candidate, image,
                              runtime.public_command(task_id), 120)
     with tempfile.TemporaryDirectory(prefix='rigmark-accept-') as directory:
         candidate = Path(directory) / 'candidate'
@@ -198,53 +194,55 @@ def grade_coding(task_id, workspace, image, arkade_root):
             target.write_text(content)
         if task_id in ('go-shutdown-deadlock', 'go-export-boundary'):
             binary = '.rigmark-hidden-' + uuid.uuid4().hex
-            build = runtime.run(candidate, image,
+            build = run_bounded(candidate, image,
                                 f'go test -race -c -o {binary} .', 90)
             if build['exit_code'] == 0 and not build['timeout']:
                 (candidate / 'rigmark_acceptance_test.go').unlink()
                 expected = {'go-shutdown-deadlock': 'TestRigmarkAcceptanceShutdown',
                             'go-export-boundary': 'TestRigmarkAcceptanceTenantBoundary'}[task_id]
-                result = runtime.run(candidate, image,
+                result = run_bounded(candidate, image,
                                      f'./{binary} -test.v -test.run "^{expected}$"', 90)
             else:
                 result = build
         elif task_id == 'c-frame-bounds':
             binary = '.rigmark-hidden-' + uuid.uuid4().hex
-            build = runtime.run(candidate, image,
+            build = run_bounded(candidate, image,
                                 'cc -std=c11 -Wall -Wextra -Werror '
                                 '-fsanitize=address,undefined -fno-omit-frame-pointer '
                                 f'-no-pie frame.c rigmark_acceptance.c -o {binary}', 45)
             if build['exit_code'] == 0 and not build['timeout']:
                 (candidate / 'rigmark_acceptance.c').unlink()
-                result = runtime.run(candidate, image,
+                result = run_bounded(candidate, image,
                                      f'ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 ./{binary}',
                                      45)
             else:
                 result = build
         elif task_id in ('sqlite-migration', 'sqlite-report'):
             module = task_id.replace('-', '_') + '_acceptance'
-            build = runtime.run(candidate, image,
+            build = run_bounded(candidate, image,
                                 'python3 -B -c "import py_compile; '
                                 f"py_compile.compile('{module}.py', "
                                 f"cfile='{module}.pyc', doraise=True)\"", 30)
             if build['exit_code'] == 0 and not build['timeout']:
                 (candidate / f'{module}.py').unlink()
-                result = runtime.run(candidate, image,
+                result = run_bounded(candidate, image,
                                      runtime.acceptance_command(task_id), 45)
             else:
                 result = build
         else:
-            result = runtime.run(candidate, image,
+            result = run_bounded(candidate, image,
                                  runtime.acceptance_command(task_id),
                                  90 if task_id == 'go-worker-pool' else 45)
         marker_path = candidate / marker if marker else None
         marker_written = (marker_path.is_file() and marker_path.stat().st_size == 9
                           and marker_path.read_bytes() == b'completed') \
             if marker_path else True
+    # SQLite's sealed unittest module runs in the parent Python process.
+    # Candidate migration code runs in a child with stdout sent to /dev/null;
+    # its terminal text cannot prove, or replace, the parent assertions.
     hidden_ran = (hidden_go_test_passed(result, task_id)
                   if task_id in ('go-shutdown-deadlock', 'go-export-boundary')
-                  else hidden_python_suite_passed(result, task_id)
-                  if task_id in ('sqlite-migration', 'sqlite-report') else True)
+                  else True)
     checks = {'acceptance': result['exit_code'] == 0 and not result['timeout']
               and hidden_ran and marker_written,
               'public_tests': public['exit_code'] == 0 and not public['timeout']}
@@ -271,7 +269,7 @@ def grade_coding(task_id, workspace, image, arkade_root):
                        else ('report.sql', 'indexes.sql'))
             for name in restore:
                 (original / name).write_text(tasks.TASKS[task_id]['files'][name])
-            regression = runtime.run(original, image, runtime.public_command(task_id), 90)
+            regression = run_bounded(original, image, runtime.public_command(task_id), 90)
         failed_new_test = bool(set(added_methods)
                                & set(regression['terminal_events']['python_failed']))
         checks['regression_fails_on_original'] = (
@@ -285,30 +283,25 @@ def grade_coding(task_id, workspace, image, arkade_root):
         if task_id == 'c-frame-bounds':
             original_body = test_body(original_tests, 'main')
             candidate_body = test_body(candidate_tests, 'main')
-            original_statements = [compact_test(part) for part in
-                                   original_body.split(';') if compact_test(part)]
-            remaining = compact_test(candidate_body)
-            preserved = bool(original_statements)
-            for statement in original_statements:
-                position = remaining.find(statement)
-                if position < 0:
-                    preserved = False
-                    break
-                remaining = remaining[position + len(statement):]
             added = candidate_body.count('assert(') > original_body.count('assert(')
             new_test_names = []
         else:
-            baseline_name = ('TestProcessesJobs' if task_id == 'go-shutdown-deadlock'
-                             else 'TestOwnerCanRead')
-            original_body = compact_test(test_body(original_tests, baseline_name))
-            candidate_body = compact_test(test_body(candidate_tests, baseline_name))
-            preserved = bool(original_body) and original_body in candidate_body
             baseline_names = set(re.findall(r'\bfunc\s+(Test\w+)\s*\(', original_tests))
             candidate_names = set(re.findall(r'\bfunc\s+(Test\w+)\s*\(', candidate_tests))
             new_test_names = sorted(candidate_names - baseline_names)
             added = bool(new_test_names)
-        checks['baseline_test_preserved'] = preserved
-        checks['regression_test_added'] = preserved and added
+        # A candidate test file can retain the original assertions as dead
+        # text. Run our original test in a clean copy against its source.
+        with tempfile.TemporaryDirectory(prefix='rigmark-baseline-') as directory:
+            baseline = Path(directory) / 'candidate'
+            shutil.copytree(workspace, baseline)
+            (baseline / test_name).write_text(original_tests)
+            baseline_run = run_bounded(baseline, image,
+                                       runtime.public_command(task_id), 90)
+        checks['baseline_contract'] = (baseline_run['exit_code'] == 0
+                                       and not baseline_run['timeout'])
+        result['baseline_control'] = baseline_run
+        checks['regression_test_added'] = added
     else:
         checks['regression_test_added'] = (
             len((workspace / test_name).read_text())
@@ -326,7 +319,7 @@ def grade_coding(task_id, workspace, image, arkade_root):
                 names = '|'.join(re.escape(name) for name in new_test_names)
                 command = (f'go test -race -count=1 -timeout=30s '
                            f'-run "^({names})$" .')
-            regression = runtime.run(original, image, command, 35)
+            regression = run_bounded(original, image, command, 35)
         events = regression['terminal_events']
         checks['regression_fails_on_original'] = (
             (regression['exit_code'] != 0 or regression['timeout'])
@@ -344,13 +337,17 @@ def grade_coding(task_id, workspace, image, arkade_root):
             '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges',
             '--user=1000:1000', '-v', f'{workspace.resolve()}:/workspace:ro',
             '-w', '/workspace', image, 'gofmt', '-l', source_name, test_name],
-            text=True, capture_output=True, timeout=30)
+            text=True, capture_output=True,
+            timeout=bounded_timeout(30, deadline))
         checks['gofmt'] = formatted.returncode == 0 and not formatted.stdout.strip()
     return checks, result
 
 
-def grade_statement(workspace, image):
+def grade_statement(workspace, image, deadline=None):
     """Run the candidate, then inject the hidden judge into a stopped copy."""
+    def run_bounded(workspace, image, command, cap):
+        return runtime.run(workspace, image, command,
+                           bounded_timeout(cap, deadline))
     fixture_root = Path(__file__).parent / 'fixtures'
     hidden = json.loads((fixture_root / 'hidden-bank-rows.json').read_text())
     cases = [('public', fixture_root / 'synthetic-bank-statement.pdf', None)]
@@ -364,7 +361,7 @@ def grade_statement(workspace, image):
             candidate = Path(directory) / 'candidate'
             shutil.copytree(workspace, candidate)
             shutil.copyfile(source, candidate / 'bank_statement.pdf')
-            run = runtime.run(candidate, image,
+            run = run_bounded(candidate, image,
                               'python3 -B redact_statement.py bank_statement.pdf redacted.pdf',
                               90)
             timed_out |= run['timeout']
@@ -381,7 +378,7 @@ rows = json.load(open("expected_rows.json"))
 rows = tuple(Transaction(**row) for row in rows) if rows else ROWS
 print(json.dumps(judge("redacted.pdf", rows)))
 ''')
-            judged = runtime.run(candidate, image, 'python3 -B judge_run.py', 90)
+            judged = run_bounded(candidate, image, 'python3 -B judge_run.py', 90)
             timed_out |= judged['timeout']
             try:
                 verdict = json.loads(judged['output'].strip()) if judged['exit_code'] == 0 else {}
@@ -403,7 +400,9 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
     workspace = make_workspace(task_id, root, arkade_root)
     originals = {path: (workspace / path).read_text() if (workspace / path).exists() else ''
                  for path in tasks.TASKS[task_id]['editable']}
-    box = tools.ToolBox(task_id, workspace, image)
+    started = time.monotonic()
+    deadline = started + seconds
+    box = tools.ToolBox(task_id, workspace, image, deadline=deadline)
     guard = governor.Governor(task_id, workspace, tasks.TASKS[task_id]['editable'])
     initial_digest = guard.digest()
     messages = [{'role': 'system', 'content':
@@ -412,14 +411,13 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
                  'Only claim actions that tools confirm. Keep the final answer concise.'},
                 {'role': 'user', 'content': tasks.TASKS[task_id]['prompt']}]
     started_at = utc_now()
-    started = time.monotonic()
     event_log = []
     failure = None
     answer = ''
     observed_models = []
     conversation_finished = False
     for step in itertools.count():
-        remaining = seconds - (time.monotonic() - started)
+        remaining = deadline - time.monotonic()
         if remaining <= 0:
             failure = 'task deadline exceeded'
             break
@@ -428,7 +426,7 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
             break
         try:
             data = completion(endpoint, model, messages, box.definitions, auth_file,
-                              max(1, remaining), reasoning_effort,
+                              remaining, reasoning_effort,
                               thinking, max_output_tokens, api_key_env)
             observed_models.append(data.get('model'))
             msg = data['choices'][0]['message']
@@ -458,6 +456,9 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
                     notice = reminder
                 if stop:
                     failure = stop
+                if time.monotonic() >= deadline:
+                    failure = 'task deadline exceeded'
+                    break
             if failure:
                 break
             reminder, stop = guard.exploration(step + 1,
@@ -476,7 +477,14 @@ def run_task(task_id, model, root, arkade_root, image, endpoint, auth_file,
                    'go-transfer-ledger', 'statement-redact',
                    'sqlite-migration', 'sqlite-report',
                    'go-shutdown-deadlock', 'go-export-boundary', 'c-frame-bounds'):
-        checks, acceptance = grade_coding(task_id, workspace, image, arkade_root)
+        try:
+            checks, acceptance = grade_coding(task_id, workspace, image,
+                                               arkade_root, deadline)
+        except (TimeoutError, subprocess.TimeoutExpired):
+            failure = 'task deadline exceeded'
+            checks = {'task_deadline': False}
+            acceptance = {'exit_code': -1, 'timeout': True,
+                          'output': 'task deadline exceeded during evaluation'}
     else:
         checks = box.grade(answer)
         acceptance = None
@@ -617,18 +625,6 @@ def selftest(root, arkade_root, image):
                                   'public_bypass': forged_checks['public_tests']},
                     'broken': {'hidden_acceptance': forged_checks['acceptance'],
                                'forged_go_event': hidden_go_test_passed(forged_result, task_id)}}
-                removed = parent / 'removed-test'
-                shutil.copytree(good, removed)
-                test_file = removed / ('service_test.go' if task_id == 'go-shutdown-deadlock'
-                                       else 'server_test.go')
-                baseline_name = ('TestProcessesJobs' if task_id == 'go-shutdown-deadlock'
-                                 else 'TestOwnerCanRead')
-                test_file.write_text(test_file.read_text().replace(
-                    'func ' + baseline_name, 'func TestRemoved' + baseline_name))
-                removed_checks, _ = grade_coding(task_id, removed, image, arkade_root)
-                outcomes[task_id + '-removed-test'] = {
-                    'reference': {'baseline_preserved': good_checks['baseline_test_preserved']},
-                    'broken': {'baseline_preserved': removed_checks['baseline_test_preserved']}}
             if task_id == 'go-shutdown-deadlock':
                 discarded = parent / 'discarded-accepted-jobs'
                 shutil.copytree(good, discarded)
@@ -662,13 +658,29 @@ def selftest(root, arkade_root, image):
                     'def migrate(conn):\n'
                     '    import os\n'
                     '    if "rigmark-migration-" in conn.execute("PRAGMA database_list").fetchone()[2]:\n'
-                    '        print("Ran 4 tests in 0.01s\\n\\nOK")\n'
+                    '        print("test_caller_can_roll_back_migration (sqlite_migration_acceptance.Acceptance.test_caller_can_roll_back_migration) ... ok\\n"\n'
+                    '              "test_conflicting_metadata_rolls_back_everything (sqlite_migration_acceptance.Acceptance.test_conflicting_metadata_rolls_back_everything) ... ok\\n"\n'
+                    '              "test_empty_legacy_schema_migrates (sqlite_migration_acceptance.Acceptance.test_empty_legacy_schema_migrates) ... ok\\n"\n'
+                    '              "test_every_line_and_other_table_survive (sqlite_migration_acceptance.Acceptance.test_every_line_and_other_table_survive) ... ok\\n"\n'
+                    '              "Ran 4 tests in 0.01s\\n\\nOK")\n'
                     '        os._exit(0)\n', 1))
                 forged_checks, _ = grade_coding(task_id, forged, image, arkade_root)
                 outcomes['sqlite-migration-forged-child-success'] = {
                     'reference': {'acceptance': good_checks['acceptance'],
                                   'public_tests': forged_checks['public_tests']},
                     'broken': {'acceptance': forged_checks['acceptance']}}
+                disabled_fk = parent / 'disabled-foreign-keys'
+                shutil.copytree(good, disabled_fk)
+                source = disabled_fk / 'migration.py'
+                source.write_text(source.read_text().replace(
+                    'def migrate(conn):\n',
+                    'def migrate(conn):\n'
+                    '    if not conn.in_transaction:\n'
+                    '        conn.execute("PRAGMA foreign_keys = OFF")\n', 1))
+                disabled_checks, _ = grade_coding(task_id, disabled_fk, image, arkade_root)
+                outcomes['sqlite-migration-foreign-keys'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': disabled_checks['acceptance']}}
                 empty = parent / 'sqlite-empty-skip'
                 shutil.copytree(good, empty)
                 source = empty / 'migration.py'
@@ -752,6 +764,18 @@ def selftest(root, arkade_root, image):
                     'reference': {'acceptance': good_checks['acceptance']},
                     'broken': {'acceptance': rerun_checks['acceptance']}}
             if task_id == 'go-export-boundary':
+                header_spoof = parent / 'header-spoof'
+                shutil.copytree(good, header_spoof)
+                source = header_spoof / 'server.go'
+                source.write_text(source.read_text().replace(
+                    'user, ok := UserFromContext(r.Context())\n',
+                    'user, ok := UserFromContext(r.Context())\n'
+                    'if !ok { user = r.Header.Get("X-User"); ok = user != "" }\n', 1))
+                header_checks, _ = grade_coding(task_id, header_spoof, image, arkade_root)
+                outcomes['go-export-header-identity'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_tests': header_checks['public_tests']},
+                    'broken': {'acceptance': header_checks['acceptance']}}
                 missing_id = parent / 'missing-owner-id'
                 shutil.copytree(good, missing_id)
                 source = missing_id / 'server.go'
@@ -827,6 +851,30 @@ def selftest(root, arkade_root, image):
                     "WHERE status = 'paid';\n"
                     'CREATE INDEX order_lines_order_id ON order_lines(order_id);\n')
                 partial_checks, _ = grade_coding(task_id, partial, image, arkade_root)
+                narrower = parent / 'nonnull-partial-index'
+                shutil.copytree(good, narrower)
+                (narrower / 'indexes.sql').write_text(
+                    "CREATE INDEX orders_paid_nonnull ON orders(ordered_on, customer_id) "
+                    "WHERE status = 'paid' AND ordered_on IS NOT NULL;\n"
+                    'CREATE INDEX order_lines_order_id ON order_lines(order_id);\n')
+                query = narrower / 'report.sql'
+                query.write_text(query.read_text().replace(
+                    'FROM orders AS o',
+                    'FROM orders AS o INDEXED BY orders_paid_nonnull').replace(
+                    'o.ordered_on >= :since',
+                    'o.ordered_on >= :since AND o.ordered_on IS NOT NULL'))
+                narrower_checks, _ = grade_coding(task_id, narrower, image, arkade_root)
+                outcomes['sqlite-report-nonnull-partial'] = {
+                    'reference': {'acceptance': narrower_checks['acceptance']},
+                    'broken': {'missing_index': broken_checks['acceptance']}}
+                changed_setting = parent / 'changed-fk-setting'
+                shutil.copytree(good, changed_setting)
+                with (changed_setting / 'indexes.sql').open('a') as sql:
+                    sql.write('\nPRAGMA foreign_keys = OFF;\n')
+                setting_checks, _ = grade_coding(task_id, changed_setting, image, arkade_root)
+                outcomes['sqlite-report-schema-setting'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': setting_checks['acceptance']}}
                 invalid_partial = parent / 'invalid-partial-index'
                 shutil.copytree(good, invalid_partial)
                 (invalid_partial / 'indexes.sql').write_text(

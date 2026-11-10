@@ -51,6 +51,7 @@ elif operation == 'conflict':
 else:
     migrate(conn)
     conn.commit()
+assert conn.execute('PRAGMA foreign_keys').fetchone()[0] == 1, 'migration disabled caller foreign keys'
 conn.close()
 raise SystemExit(42)
 '''

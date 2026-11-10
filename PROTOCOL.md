@@ -29,7 +29,9 @@ A task can have correct code and an unfinished conversation.
 
 Eighteen tasks use the restricted typed-tool harness. Coding checks run in an
 offline Docker container with a read-only root, resource limits, and no
-Docker socket. Candidate output is capped at 4 MiB within the task deadline.
+Docker socket. Each Docker command's captured output is capped at 4 MiB.
+The task deadline also bounds model requests, tool execution, and final
+grading; container cleanup may add a few seconds after a timeout.
 That interface is a significant harness choice; its results
 are not ordinary terminal-agent results. The document and refusal tasks
 remain exploratory. The refusal check is a smoke test, not a cyber benchmark.

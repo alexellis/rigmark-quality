@@ -41,23 +41,19 @@ class BaselineTestTests(unittest.TestCase):
         changed = cli.compact_test(cli.test_body(without_assertion, 'TestOwnerCanRead'))
         self.assertNotIn(baseline, changed)
 
-    def test_sqlite_acceptance_needs_terminal_events(self):
-        output = ('test_large_repetitive_seed '
-                  '(sqlite_report_acceptance.Acceptance.test_large_repetitive_seed) '
-                  '... ok\n'
-                  'test_different_seed_and_date '
-                  '(sqlite_report_acceptance.Acceptance.test_different_seed_and_date) '
-                  '... ok\n\n----------------------------------------------------------------------\n'
-                  'Ran 2 tests in 0.2s\n\nOK\n')
-        self.assertTrue(cli.hidden_python_suite_passed(
-            {'terminal_events': runtime.terminal_events(io.BytesIO(output.encode()))},
-                                                       'sqlite-report'))
-        self.assertFalse(cli.hidden_python_suite_passed(
-            {'terminal_events': runtime.terminal_events(io.BytesIO(b''))},
-                                                        'sqlite-report'))
-
-
 class PublicTestIsolationTests(unittest.TestCase):
+    def test_tool_command_uses_remaining_task_time(self):
+        with tempfile.TemporaryDirectory() as directory:
+            box = ToolBox('go-worker-pool', Path(directory), 'unused',
+                          timeout=120, deadline=100)
+            with mock.patch('quality_suite.tools.time.monotonic', return_value=92), \
+                 mock.patch('quality_suite.tools.runtime.run', return_value={'exit_code': 0}) as run:
+                self.assertEqual(box.call('format_go', '{}')['exit_code'], 0)
+                self.assertEqual(run.call_args.args[-1], 8)
+            with mock.patch('quality_suite.tools.time.monotonic', return_value=101):
+                self.assertEqual(box.call('format_go', '{}')['kind'],
+                                 'invalid_tool_call')
+
     def test_test_time_changes_do_not_reach_workspace(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -178,7 +174,9 @@ class ReviewGradeTests(unittest.TestCase):
         for ending in ('Submit does not send, so there is no crash.',
                        'Submit cannot enqueue, so it does not panic.',
                        'Submit won\'t send, so there is no crash.',
-                       'Submit never sends and cannot crash.'):
+                       'Submit never sends and cannot crash.',
+                       'Submit sends without panicking or crashing.',
+                       'Submit sends but fails to panic.'):
             with self.subTest(ending=ending):
                 self.assertFalse(advanced_evaluators.review_cause(
                     'send-on-closed-channel race', prefix + ending))

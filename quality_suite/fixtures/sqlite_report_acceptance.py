@@ -30,8 +30,26 @@ class Acceptance(unittest.TestCase):
                      (2 * orders + 1, orders + 1, 'BOUNDARY', 1, 1000000000))
         before = {table: conn.execute(f'SELECT * FROM {table} ORDER BY id').fetchall()
                   for table in ('customers', 'orders', 'order_lines')}
+        schema_before = {row[1]: row for row in conn.execute(
+            'SELECT type, name, tbl_name, sql FROM sqlite_schema')}
+        settings_before = tuple(conn.execute(f'PRAGMA {name}').fetchone()[0]
+                                for name in ('foreign_keys', 'user_version',
+                                             'recursive_triggers', 'automatic_index'))
         want = expected(conn, since)
         conn.executescript(Path('indexes.sql').read_text())
+        schema_after = {row[1]: row for row in conn.execute(
+            'SELECT type, name, tbl_name, sql FROM sqlite_schema')}
+        self.assertEqual({name: schema_after.get(name) for name in schema_before},
+                         schema_before, 'indexes.sql changed an existing schema object')
+        for name, (kind, _, table, sql) in schema_after.items():
+            if name not in schema_before:
+                self.assertEqual(kind, 'index', 'indexes.sql added a non-index object')
+                self.assertIn(table, ('orders', 'order_lines'))
+                self.assertRegex(sql or '', r'(?i)^CREATE\s+INDEX\b')
+        self.assertEqual(tuple(conn.execute(f'PRAGMA {name}').fetchone()[0]
+                               for name in ('foreign_keys', 'user_version',
+                                            'recursive_triggers', 'automatic_index')),
+                         settings_before, 'indexes.sql changed a connection setting')
         for table, rows in before.items():
             self.assertEqual(conn.execute(f'SELECT * FROM {table} ORDER BY id').fetchall(), rows,
                              table + ' changed while adding indexes')
@@ -69,18 +87,34 @@ class Acceptance(unittest.TestCase):
         plan = '\n'.join(plan_rows)
         indexes = {row[1] for row in conn.execute('PRAGMA index_list(orders)')}
         definitions = dict(conn.execute(
-            "SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='orders'"))
+            "SELECT name, sql FROM sqlite_schema WHERE type='index' AND tbl_name='orders'"))
         # SQLite renders both >= and > as >? in EXPLAIN QUERY PLAN. The
         # boundary result above distinguishes their semantics. A partial
         # index WHERE status='paid' supplies the status filter without a
         # status=? term in the plan.
         ordered_on = r'\bordered_on\s*>\s*\?'
-        paid_predicate = r"\s*\(*\s*status\s*=\s*['\"]paid['\"]\s*\)*\s*;?\s*"
         def paid_only_index(name):
             definition = definitions.get(name) or ''
             predicate = re.search(r'\bWHERE\b(.*)$', definition, re.I | re.S)
-            return bool(predicate and re.fullmatch(paid_predicate,
-                                                   predicate.group(1), re.I))
+            if not predicate or re.search(r'\bOR\b', predicate.group(1), re.I):
+                return False
+            if not re.search(r"\bstatus\s*=\s*['\"]paid['\"]",
+                             predicate.group(1), re.I):
+                return False
+            quoted = '"' + name.replace('"', '""') + '"'
+            query = ('EXPLAIN QUERY PLAN SELECT id FROM orders INDEXED BY '
+                     + quoted + " WHERE status = 'paid' AND ordered_on >= ? "
+                     'AND ordered_on IS NOT NULL')
+            try:
+                conn.execute(query, (since,)).fetchall()
+            except sqlite3.OperationalError:
+                return False
+            try:
+                conn.execute(query.replace("status = 'paid'", "status = 'pending'"),
+                             (since,)).fetchall()
+            except sqlite3.OperationalError:
+                return True
+            return False
         self.assertTrue(any(
             name in indexes and re.search(ordered_on, terms)
             and (re.search(r'\bstatus\s*=\s*\?', terms)

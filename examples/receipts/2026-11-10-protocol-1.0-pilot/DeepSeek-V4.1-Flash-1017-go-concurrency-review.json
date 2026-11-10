@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "315261970fe5e089827945d45e191f736841fd0c019a754292f0c9a346c5bd1b",
+  "suite_sha256": "9f5e7a340d348b60c070fbb0ca6d10dc1b967bb477a519a7341df59bfac754b1",
   "task_sha256": "05364d05afbf46f3d131b2bc3b82309e406c4c2f87ff72b56c6ba72b00bbd7a6",
   "request": {
     "temperature": 0,
@@ -60,8 +60,8 @@
   "review_output_format": "fenced_json",
   "regrade": {
     "method": "offline_hidden_judge",
-    "source_suite_sha256": "f2409820d9f11a35b5c1fd258c295218d0fa0420ecf2e1f19a6d5bc969093aac",
-    "regraded_at": "2026-11-10T20:52:59.628388+00:00",
+    "source_suite_sha256": "f6134f4f8fe127c96f87167c932535a5fef69632be56d441e6986d518bc58059",
+    "regraded_at": "2026-11-10T21:30:57.415663+00:00",
     "model_inference_repeated": false
   },
   "receipt_kind": "public_summary",

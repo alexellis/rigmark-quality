@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
+import time
 from . import advanced_evaluators, runtime
 from .tasks import TASKS
 
@@ -50,9 +51,10 @@ def validate(args, schema):
 
 
 class ToolBox:
-    def __init__(self, task_id, workspace, image, timeout=120):
+    def __init__(self, task_id, workspace, image, timeout=120, deadline=None):
         self.task_id,self.workspace,self.image=task_id,workspace,image
         self.timeout=timeout
+        self.deadline=deadline
         self.calls=[]
         self.stock={'A':5,'B':1,'revision':7}
         self.conflict=False
@@ -82,12 +84,14 @@ class ToolBox:
     def call(self,name,arguments):
         record={'name':name,'arguments':arguments}
         try:
+            if self.deadline is not None and time.monotonic() >= self.deadline:
+                raise TimeoutError('task deadline exceeded before tool call')
             definition=next((t for t in self.definitions if t['function']['name']==name),None)
             if not definition: raise ValueError('unknown tool')
             args=json.loads(arguments)
             validate(args,definition['function']['parameters'])
             result=self.execute(name,args)
-        except (ValueError, OSError, KeyError, UnicodeError) as e:
+        except (ValueError, OSError, KeyError, UnicodeError, TimeoutError) as e:
             result={'error':str(e), 'kind':'invalid_tool_call'}
         record['result']=result
         self.calls.append(record)
@@ -146,7 +150,7 @@ class ToolBox:
                 shutil.copytree(self.workspace, candidate,
                                 ignore=shutil.ignore_patterns('.git'))
                 return runtime.run(candidate,self.image,
-                                   runtime.public_command(self.task_id),self.timeout)
+                                   runtime.public_command(self.task_id),self.remaining_timeout())
         if name=='format_go':
             command = {'go-worker-pool':'gofmt -s -w pool.go pool_test.go',
                        'go-transfer-ledger':'gofmt -s -w transfer.go transfer_test.go',
@@ -154,7 +158,7 @@ class ToolBox:
                        'go-export-boundary':'gofmt -s -w server.go server_test.go',
                        'arkade-add':'gofmt -s -w pkg/get/tools.go pkg/get/rigmark_test.go'}.get(self.task_id)
             if not command: raise ValueError('not a Go task')
-            return runtime.run(self.workspace,self.image,command,self.timeout)
+            return runtime.run(self.workspace,self.image,command,self.remaining_timeout())
         if name=='stock_read': return dict(self.stock)
         if name=='stock_transfer':
             if (a['sku'],a['source'],a['destination'],a['quantity'])!=('CAB-4','A','B',2):
@@ -200,6 +204,14 @@ class ToolBox:
             return {'ok':True,'status':'committed','payment':committed,
                     'balances':dict(self.payments['balances'])}
         raise ValueError('unimplemented tool')
+
+    def remaining_timeout(self):
+        if self.deadline is None:
+            return self.timeout
+        remaining = self.deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError('task deadline exceeded before tool execution')
+        return min(self.timeout, remaining)
 
     def grade(self,answer):
         if self.task_id=='stock-transfer':
