@@ -1,9 +1,10 @@
 import json
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
-from . import advanced_evaluators, advanced_tasks, cli, tasks
+from . import advanced_evaluators, advanced_tasks, cli, runtime, tasks
 from .tools import ToolBox
 
 
@@ -38,6 +39,44 @@ class BaselineTestTests(unittest.TestCase):
             '')
         changed = cli.compact_test(cli.test_body(without_assertion, 'TestOwnerCanRead'))
         self.assertNotIn(baseline, changed)
+
+    def test_sqlite_acceptance_needs_terminal_events(self):
+        output = ('test_large_repetitive_seed '
+                  '(sqlite_report_acceptance.Acceptance.test_large_repetitive_seed) '
+                  '... ok\n'
+                  'test_different_seed_and_date '
+                  '(sqlite_report_acceptance.Acceptance.test_different_seed_and_date) '
+                  '... ok\n\n----------------------------------------------------------------------\n'
+                  'Ran 2 tests in 0.2s\n\nOK\n')
+        self.assertTrue(cli.hidden_python_suite_passed({'output': output},
+                                                       'sqlite-report'))
+        self.assertFalse(cli.hidden_python_suite_passed({'output': ''},
+                                                        'sqlite-report'))
+
+
+class PublicTestIsolationTests(unittest.TestCase):
+    def test_test_time_changes_do_not_reach_workspace(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'schema.py').write_text('trusted fixture')
+            box = ToolBox('python-expiry', root, 'unused')
+
+            def mutate_copy(candidate, image, command, timeout):
+                (candidate / 'schema.py').write_text('candidate mutation')
+                return {'exit_code': 0, 'timeout': False, 'output': ''}
+
+            with mock.patch('quality_suite.runtime.run', side_effect=mutate_copy):
+                box.call('run_tests', '{}')
+            self.assertEqual((root / 'schema.py').read_text(), 'trusted fixture')
+
+    def test_long_output_retains_terminal_result(self):
+        result = runtime.capture(['python3', '-c',
+                                  'print("start"); print("x" * 70000); '
+                                  'print("terminal verdict")'])
+        self.assertEqual(result['exit_code'], 0)
+        self.assertIn('start', result['output'])
+        self.assertIn('terminal verdict', result['output'])
+        self.assertIn('[intermediate output omitted]', result['output'])
 
 
 class ReviewGradeTests(unittest.TestCase):
@@ -123,6 +162,13 @@ class ReviewGradeTests(unittest.TestCase):
                     'and panics.')
         self.assertTrue(advanced_evaluators.review_cause(
             'channel-close race', evidence))
+
+    def test_causal_review_accepts_queue_vocabulary(self):
+        evidence = ('Submit drops the mutex after checking the dispatcher is open. '
+                    'Close shuts the queue, and the later enqueue crashes because '
+                    'the jobs channel is closed.')
+        self.assertTrue(advanced_evaluators.review_cause(
+            'send_on_closed_jobs', evidence))
 
     def test_false_positive_fails(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -81,12 +81,17 @@ class Acceptance(unittest.TestCase):
                 conn.executemany('INSERT INTO invoice_lines VALUES (?,?,?,?,?,?,?,?)', rows)
                 conn.execute("INSERT INTO audit_log VALUES (7, 'retain')")
                 conn.commit()
+                conn.execute("INSERT INTO audit_log VALUES (8, 'caller work')")
                 with self.assertRaises(Exception):
                     migrate(conn)
                 self.assertEqual(tables(conn), {'invoice_lines', 'audit_log'})
                 self.assertEqual(conn.execute('SELECT * FROM invoice_lines ORDER BY line_id').fetchall(), rows)
-                self.assertEqual(conn.execute('SELECT * FROM audit_log').fetchall(), [(7, 'retain')])
+                self.assertEqual(conn.execute('SELECT * FROM audit_log ORDER BY rowid').fetchall(),
+                                 [(7, 'retain'), (8, 'caller work')])
                 self.assertEqual(conn.execute('PRAGMA user_version').fetchone()[0], 0)
+                conn.rollback()
+                self.assertEqual(conn.execute('SELECT * FROM audit_log').fetchall(),
+                                 [(7, 'retain')])
 
     def test_caller_can_roll_back_migration(self):
         conn = legacy_connection()

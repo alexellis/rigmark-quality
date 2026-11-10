@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "945ceaff51b9ed4088e4917074c54e6c0cd06fb472e8fded614b6627b7087242",
+  "suite_sha256": "15f464151c933f8d2c7067f9aa25cd8add1b05a689c687096cc25c163162140c",
   "task_sha256": "c41678fb81384bd3baeb994f822104e1b502c7dcd66b83f440dff2c9fcab4658",
   "request": {
     "temperature": 0,
@@ -24,35 +24,30 @@
     "nvidia/GLM-5.3-Flash-NVFP4",
     "nvidia/GLM-5.3-Flash-NVFP4",
     "nvidia/GLM-5.3-Flash-NVFP4",
-    "nvidia/GLM-5.3-Flash-NVFP4",
-    "nvidia/GLM-5.3-Flash-NVFP4",
-    "nvidia/GLM-5.3-Flash-NVFP4",
-    "nvidia/GLM-5.3-Flash-NVFP4",
-    "nvidia/GLM-5.3-Flash-NVFP4",
     "nvidia/GLM-5.3-Flash-NVFP4"
   ],
   "model_match": true,
-  "started_at": "2026-11-10T19:02:30.767145+00:00",
-  "finished_at": "2026-11-10T19:02:50.161384+00:00",
-  "elapsed_seconds": 19.4,
+  "started_at": "2026-11-10T19:26:37.929370+00:00",
+  "finished_at": "2026-11-10T19:26:49.536966+00:00",
+  "elapsed_seconds": 11.6,
   "usage": {
-    "prompt_tokens": 17256,
-    "completion_tokens": 1082,
-    "reasoning_tokens": 81
+    "prompt_tokens": 5820,
+    "completion_tokens": 702,
+    "reasoning_tokens": 0
   },
   "reasoning_diagnostics": {
-    "characters": 254,
-    "repeated_trigram_fraction": 0.025,
+    "characters": 4,
+    "repeated_trigram_fraction": 0.0,
     "loop_detected": false
   },
   "tool_diagnostics": {
-    "parsed_calls": 13,
+    "parsed_calls": 7,
     "invalid_calls": 0,
     "no_call_or_answer": false,
     "unfinished_after_tool": false,
     "unparsed_tool_markup": false
   },
-  "steps": 10,
+  "steps": 5,
   "checks": {
     "acceptance": true,
     "public_tests": true,
@@ -66,5 +61,5 @@
   "failure": null,
   "review_output_format": null,
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with hardened hidden acceptance, transaction, boundary, and regression checks. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with isolated public tests and hardened hidden acceptance, transaction, boundary, and regression checks. Conversation, tool calls, file diffs, and endpoint details omitted."
 }

@@ -57,11 +57,16 @@ class Acceptance(unittest.TestCase):
         # index WHERE status='paid' supplies the status filter without a
         # status=? term in the plan.
         ordered_on = r'\bordered_on\s*>\s*\?'
-        paid_predicate = r"\bWHERE\s+status\s*=\s*['\"]paid['\"]"
+        paid_predicate = r"\s*\(*\s*status\s*=\s*['\"]paid['\"]\s*\)*\s*;?\s*"
+        def paid_only_index(name):
+            definition = definitions.get(name) or ''
+            predicate = re.search(r'\bWHERE\b(.*)$', definition, re.I | re.S)
+            return bool(predicate and re.fullmatch(paid_predicate,
+                                                   predicate.group(1), re.I))
         self.assertTrue(any(
             name in indexes and re.search(ordered_on, terms)
             and (re.search(r'\bstatus\s*=\s*\?', terms)
-                 or re.search(paid_predicate, definitions.get(name) or '', re.I))
+                 or paid_only_index(name))
             for name, terms in lookups),
             'orders has no indexed lookup on paid status and date:\n' + plan)
         line_indexes = {row[1] for row in conn.execute('PRAGMA index_list(order_lines)')}

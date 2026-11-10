@@ -153,9 +153,9 @@ def review_format(answer):
 
 def review_kind(kind):
     words = set(re.findall(r'[a-z]+', kind.casefold()))
-    return ('channel' in words and
-            bool(words & {'close', 'closed', 'closing'}) and
-            bool(words & {'send', 'race', 'panic'}))
+    return (bool(words & {'channel', 'jobs', 'queue'}) and
+            bool(words & {'close', 'closed', 'closing', 'shut'}) and
+            bool(words & {'send', 'enqueue', 'race', 'panic', 'crash'}))
 
 
 def review_cause(kind, evidence):
@@ -166,21 +166,16 @@ def review_cause(kind, evidence):
                   r'(?:\w+\s+){0,2}panic\b', text)
             or re.search(r'\b(?:is|remains)\s+safe\b', text)):
         return False
-    unlock = re.search(r'\b(?:unlocks?|releases?)\b', text)
-    closes_jobs = re.search(r'\bcloses?\s*\(?\s*(?:d\.)?jobs\b', text)
-    if not unlock or not closes_jobs or unlock.start() > closes_jobs.start():
-        return False
-    cause = text.partition('interleaving:')[2] or text
+    cause = text
     position = 0
     for pattern in (
             r'\bsubmit\b',
-            r'\b(?:reads?|observes?|checks?|sees?|loads?|finds?)\s+'
-            r'(?:the\s+)?(?:(?:d\.)?(?:wasclosed|closed)\s*(?:==|=)\s*false'
-            r'|(?:dispatcher\s+)?open)\b',
+            r'\b(?:unlocks?|releases?|drops?)\b(?:\s+(?:the\s+)?(?:mutex|lock))?',
             r'\bclose\b',
-            r'\bcloses?\s*\(?\s*(?:d\.)?jobs\b',
-            r'(?:\b(?:d\.)?jobs\s*<-\s*job\b|\bsends?\b)',
-            r'\bpanic(?:s|king|ked)?\b'):
+            r'\b(?:closes?|shuts?(?:\s+down)?|terminates?)\s*'
+            r'(?:the\s+)?(?:\(?\s*(?:d\.)?jobs|channel|queue)\b',
+            r'(?:\b(?:d\.)?jobs\s*<-\s*job\b|\bsends?\b|\benqueues?\b)',
+            r'\b(?:panic(?:s|king|ked)?|crash(?:es|ed)?)\b'):
         match = re.search(pattern, cause[position:])
         if not match:
             return False

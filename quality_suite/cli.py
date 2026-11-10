@@ -99,14 +99,26 @@ def make_workspace(task_id, root, arkade_root):
 def hidden_go_test_passed(result, task_id):
     expected = {'go-shutdown-deadlock': 'TestRigmarkAcceptanceShutdown',
                 'go-export-boundary': 'TestRigmarkAcceptanceTenantBoundary'}[task_id]
-    for line in result['output'].splitlines():
-        try:
-            event = json.loads(line)
-        except ValueError:
-            continue
-        if event.get('Action') == 'pass' and event.get('Test') == expected:
-            return True
-    return False
+    return bool(re.search(r'(?m)^--- PASS: ' + re.escape(expected) + r' \(',
+                          result['output']))
+
+
+def hidden_python_suite_passed(result, task_id):
+    expected = {
+        'sqlite-migration': ('test_caller_can_roll_back_migration',
+                             'test_conflicting_metadata_rolls_back_everything',
+                             'test_every_line_and_other_table_survive'),
+        'sqlite-report': ('test_different_seed_and_date',
+                          'test_large_repetitive_seed'),
+    }[task_id]
+    output = result['output']
+    module = task_id.replace('-', '_') + '_acceptance'
+    return (all(re.search(r'(?m)^' + re.escape(name) + r' \('
+                          + re.escape(module) + r'\.Acceptance\.'
+                          + re.escape(name) + r'\) \.\.\. ok$', output)
+                for name in expected)
+            and bool(re.search(r'(?m)^Ran ' + str(len(expected))
+                               + r' tests? in [^\n]+\n\nOK$', output)))
 
 
 def python_test_methods(source, module):
@@ -186,15 +198,55 @@ def grade_coding(task_id, workspace, image, arkade_root):
             target = candidate / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content)
-        result = runtime.run(candidate, image, runtime.acceptance_command(task_id),
-                             90 if task_id in ('go-worker-pool', 'go-shutdown-deadlock',
-                                                'go-export-boundary') else 45)
+        if task_id in ('go-shutdown-deadlock', 'go-export-boundary'):
+            binary = '.rigmark-hidden-' + uuid.uuid4().hex
+            build = runtime.run(candidate, image,
+                                f'go test -race -c -o {binary} .', 90)
+            if build['exit_code'] == 0 and not build['timeout']:
+                (candidate / 'rigmark_acceptance_test.go').unlink()
+                expected = {'go-shutdown-deadlock': 'TestRigmarkAcceptanceShutdown',
+                            'go-export-boundary': 'TestRigmarkAcceptanceTenantBoundary'}[task_id]
+                result = runtime.run(candidate, image,
+                                     f'./{binary} -test.v -test.run "^{expected}$"', 90)
+            else:
+                result = build
+        elif task_id == 'c-frame-bounds':
+            binary = '.rigmark-hidden-' + uuid.uuid4().hex
+            build = runtime.run(candidate, image,
+                                'cc -std=c11 -Wall -Wextra -Werror '
+                                '-fsanitize=address,undefined -fno-omit-frame-pointer '
+                                f'-no-pie frame.c rigmark_acceptance.c -o {binary}', 45)
+            if build['exit_code'] == 0 and not build['timeout']:
+                (candidate / 'rigmark_acceptance.c').unlink()
+                result = runtime.run(candidate, image,
+                                     f'ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 ./{binary}',
+                                     45)
+            else:
+                result = build
+        elif task_id in ('sqlite-migration', 'sqlite-report'):
+            module = task_id.replace('-', '_') + '_acceptance'
+            build = runtime.run(candidate, image,
+                                'python3 -B -c "import py_compile; '
+                                f"py_compile.compile('{module}.py', "
+                                f"cfile='{module}.pyc', doraise=True)\"", 30)
+            if build['exit_code'] == 0 and not build['timeout']:
+                (candidate / f'{module}.py').unlink()
+                result = runtime.run(candidate, image,
+                                     runtime.acceptance_command(task_id), 45)
+            else:
+                result = build
+        else:
+            result = runtime.run(candidate, image,
+                                 runtime.acceptance_command(task_id),
+                                 90 if task_id == 'go-worker-pool' else 45)
         marker_path = candidate / marker if marker else None
         marker_written = (marker_path.is_file() and marker_path.stat().st_size == 9
                           and marker_path.read_bytes() == b'completed') \
             if marker_path else True
     hidden_ran = (hidden_go_test_passed(result, task_id)
-                  if task_id in ('go-shutdown-deadlock', 'go-export-boundary') else True)
+                  if task_id in ('go-shutdown-deadlock', 'go-export-boundary')
+                  else hidden_python_suite_passed(result, task_id)
+                  if task_id in ('sqlite-migration', 'sqlite-report') else True)
     checks = {'acceptance': result['exit_code'] == 0 and not result['timeout']
               and hidden_ran and marker_written,
               'public_tests': public['exit_code'] == 0 and not public['timeout']}
@@ -590,6 +642,19 @@ def selftest(root, arkade_root, image):
                                   'fails_old': good_checks['regression_fails_on_original']},
                     'broken': {'comment_only': comment_checks['regression_test_added']}}
             if task_id == 'sqlite-migration':
+                early_exit = parent / 'sqlite-import-exit'
+                shutil.copytree(good, early_exit)
+                source = early_exit / 'migration.py'
+                source.write_text(
+                    'import os\nfrom pathlib import Path\n'
+                    'if Path("sqlite_migration_acceptance.pyc").exists(): '
+                    'os._exit(0)\n' + source.read_text())
+                early_checks, _ = grade_coding(
+                    task_id, early_exit, image, arkade_root)
+                outcomes['sqlite-migration-import-exit'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_tests': early_checks['public_tests']},
+                    'broken': {'acceptance': early_checks['acceptance']}}
                 rollback = parent / 'rollback-entry'
                 shutil.copytree(good, rollback)
                 source = rollback / 'migration.py'
@@ -599,6 +664,18 @@ def selftest(root, arkade_root, image):
                 outcomes['sqlite-migration-rollback-entry'] = {
                     'reference': {'acceptance': good_checks['acceptance']},
                     'broken': {'acceptance': rollback_checks['acceptance']}}
+                conflict_rollback = parent / 'rollback-conflict'
+                shutil.copytree(good, conflict_rollback)
+                source = conflict_rollback / 'migration.py'
+                source.write_text(source.read_text().replace(
+                    'raise ValueError("conflicting metadata for invoice " + invoice_id)',
+                    'conn.rollback()\n                '
+                    'raise ValueError("conflicting metadata for invoice " + invoice_id)'))
+                conflict_checks, _ = grade_coding(
+                    task_id, conflict_rollback, image, arkade_root)
+                outcomes['sqlite-migration-rollback-conflict'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': conflict_checks['acceptance']}}
                 rerun = parent / 'destructive-rerun'
                 shutil.copytree(good, rerun)
                 source = rerun / 'migration.py'
@@ -645,9 +722,18 @@ def selftest(root, arkade_root, image):
                     'CREATE INDEX order_lines_order_id ON order_lines(order_id);\n')
                 invalid_partial_checks, _ = grade_coding(
                     task_id, invalid_partial, image, arkade_root)
+                broad_partial = parent / 'broad-partial-index'
+                shutil.copytree(good, broad_partial)
+                (broad_partial / 'indexes.sql').write_text(
+                    "CREATE INDEX orders_broad_date ON orders(ordered_on, customer_id) "
+                    "WHERE status = 'paid' OR status <> 'paid';\n"
+                    'CREATE INDEX order_lines_order_id ON order_lines(order_id);\n')
+                broad_partial_checks, _ = grade_coding(
+                    task_id, broad_partial, image, arkade_root)
                 outcomes['sqlite-report-partial-index'] = {
                     'reference': {'valid_partial_index': partial_checks['acceptance']},
-                    'broken': {'invalid_partial_index': invalid_partial_checks['acceptance']}}
+                    'broken': {'invalid_partial_index': invalid_partial_checks['acceptance'],
+                               'broad_partial_index': broad_partial_checks['acceptance']}}
                 (good / 'indexes.sql').write_text(
                     'CREATE INDEX orders_date_status ON orders(ordered_on, status);\n'
                     'CREATE INDEX order_lines_order_id ON order_lines(order_id);\n')

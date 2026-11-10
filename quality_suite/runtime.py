@@ -21,8 +21,16 @@ def capture(command, timeout=60):
             timed_out = True
             os.killpg(p.pid, signal.SIGKILL)
             p.wait()
-        log.seek(0)
-        output = log.read(65536).decode('utf-8', errors='replace')
+        size = log.seek(0, os.SEEK_END)
+        if size <= 65536:
+            log.seek(0)
+            output = log.read().decode('utf-8', errors='replace')
+        else:
+            log.seek(0)
+            head = log.read(32768).decode('utf-8', errors='replace')
+            log.seek(size - 32768)
+            tail = log.read().decode('utf-8', errors='replace')
+            output = head + '\n[intermediate output omitted]\n' + tail
         return {'exit_code': p.returncode, 'timeout': timed_out, 'output': output}
 
 

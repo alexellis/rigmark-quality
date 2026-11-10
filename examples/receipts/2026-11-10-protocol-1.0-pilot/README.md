@@ -16,7 +16,7 @@ conversation on all six tasks in this pilot.
 | C frame bounds | Pass | Pass | Pass |
 
 All receipts use suite SHA-256
-`945ceaff51b9ed4088e4917074c54e6c0cd06fb472e8fded614b6627b7087242`,
+`15f464151c933f8d2c7067f9aa25cd8add1b05a689c687096cc25c163162140c`,
 temperature 0, top-p 1, seed 20261011, requested low reasoning, provider
 default thinking, a 32,768-token response cap, no turn cap, and a 1,800-second
 task deadline. All six tasks were rerun for each model on 10 November after
@@ -25,7 +25,9 @@ reject premature exits from the Go and C acceptance tests, a migration that
 rolls back the caller's transaction or mutates unrelated data on rerun, an
 exclusive date boundary, replaced baseline tests, and comment-only SQLite
 regression tests. The report judge accepts a valid partial index, and the
-review judge accepts equivalent descriptions of a channel-close race.
+review judge accepts equivalent descriptions of a channel-close race. Public
+tests run on disposable copies, and withheld fixtures are compiled before
+their source is removed from the execution copy.
 
 GLM 5.3 Flash NVFP4 ran through Toilgate on four DGX Sparks. DeepSeek V4.1
 Flash 1017 used Mia's 2.9 bpw EXL3 TensorFold recipe directly on two DGX

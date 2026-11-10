@@ -32,6 +32,12 @@ offline Docker container with a read-only root, resource limits, and no
 Docker socket. That interface is a significant harness choice; its results
 are not ordinary terminal-agent results. The document and refusal tasks
 remain exploratory. The refusal check is a smoke test, not a cyber benchmark.
+The agent's `run_tests` works on a disposable copy, so test-time writes cannot
+alter protected workspace files. Withheld Go, C, and SQLite checks are
+compiled before their source is removed from the execution copy; the parent
+also requires terminal test evidence. These measures detect premature exits
+and accidental fixture tampering. They are not a hardened defence against
+code deliberately written to reverse engineer and forge the judge.
 
 Two SQLite tasks extend that harness. `sqlite-migration` checks preservation
 of all invoice lines, safe reruns, and rollback of conflicting or caller-owned

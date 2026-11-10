@@ -3,6 +3,8 @@ import fnmatch
 import json
 from pathlib import Path
 import re
+import shutil
+import tempfile
 from . import advanced_evaluators, runtime
 from .tasks import TASKS
 
@@ -139,7 +141,12 @@ class ToolBox:
             p.parent.mkdir(parents=True,exist_ok=True);p.write_text(content)
             return {'written':a['path']}
         if name=='run_tests':
-            return runtime.run(self.workspace,self.image,runtime.public_command(self.task_id),self.timeout)
+            with tempfile.TemporaryDirectory(prefix='rigmark-public-tool-') as directory:
+                candidate = Path(directory) / 'candidate'
+                shutil.copytree(self.workspace, candidate,
+                                ignore=shutil.ignore_patterns('.git'))
+                return runtime.run(candidate,self.image,
+                                   runtime.public_command(self.task_id),self.timeout)
         if name=='format_go':
             command = {'go-worker-pool':'gofmt -s -w pool.go pool_test.go',
                        'go-transfer-ledger':'gofmt -s -w transfer.go transfer_test.go',
