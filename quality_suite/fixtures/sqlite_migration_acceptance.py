@@ -131,8 +131,10 @@ class Acceptance(unittest.TestCase):
                 conn.execute("INSERT INTO audit_log VALUES (7, 'retain')")
                 conn.commit()
                 conn.execute("INSERT INTO audit_log VALUES (8, 'caller work')")
+                before_conflict = state(conn)
                 with self.assertRaises(Exception):
                     migrate(conn)
+                self.assertEqual(state(conn), before_conflict)
                 self.assertEqual(tables(conn), {'invoice_lines', 'audit_log'})
                 self.assertEqual(conn.execute('SELECT * FROM invoice_lines ORDER BY line_id').fetchall(), rows)
                 self.assertEqual(conn.execute('SELECT * FROM audit_log ORDER BY rowid').fetchall(),

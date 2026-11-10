@@ -22,7 +22,7 @@
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
-│  Tasks 6  ·  Suite 1.0  ·  SHA256 f2409820d9f11a35…                        │
+│  Tasks 6  ·  Suite 1.0  ·  SHA256 a832ddf234f989b3…                        │
 │  Reasoning low  ·  Thinking default  ·  Output cap 32768                   │
 │  Turn cap none  ·  Time cap 1800s                                          │
 │                                                                            │
@@ -51,7 +51,7 @@
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
-│  Tasks 6  ·  Suite 1.0  ·  SHA256 f2409820d9f11a35…                        │
+│  Tasks 6  ·  Suite 1.0  ·  SHA256 a832ddf234f989b3…                        │
 │  Reasoning low  ·  Thinking default  ·  Output cap 32768                   │
 │  Turn cap none  ·  Time cap 1800s                                          │
 │                                                                            │
@@ -80,7 +80,7 @@
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
-│  Tasks 6  ·  Suite 1.0  ·  SHA256 f2409820d9f11a35…                        │
+│  Tasks 6  ·  Suite 1.0  ·  SHA256 a832ddf234f989b3…                        │
 │  Reasoning low  ·  Thinking default  ·  Output cap 32768                   │
 │  Turn cap none  ·  Time cap 1800s                                          │
 │                                                                            │

@@ -692,7 +692,29 @@ def selftest(root, arkade_root, image):
                 outcomes['sqlite-migration-destructive-rerun'] = {
                     'reference': {'acceptance': good_checks['acceptance']},
                     'broken': {'acceptance': rerun_checks['acceptance']}}
+            if task_id == 'go-export-boundary':
+                leaked = parent / 'unauthenticated-leak'
+                shutil.copytree(good, leaked)
+                source = leaked / 'server.go'
+                source.write_text(source.read_text().replace(
+                    'http.Error(w, "unauthorised", http.StatusUnauthorized); return',
+                    'w.WriteHeader(http.StatusUnauthorized); '
+                    'w.Write([]byte("alice-private")); return'))
+                leak_checks, _ = grade_coding(task_id, leaked, image, arkade_root)
+                outcomes['go-export-unauthenticated-leak'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': leak_checks['acceptance']}}
             if task_id == 'c-frame-bounds':
+                null_unsafe = parent / 'null-unsafe'
+                shutil.copytree(good, null_unsafe)
+                source = null_unsafe / 'frame.c'
+                source.write_text(source.read_text().replace(
+                    'if (!frame || !out || frame_len < 1 || out_cap < 1)',
+                    'if (frame_len < 1 || out_cap < 1)'))
+                null_checks, _ = grade_coding(task_id, null_unsafe, image, arkade_root)
+                outcomes['c-frame-null-pointer'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': null_checks['acceptance']}}
                 source = good / 'frame.c'
                 source.write_text(source.read_text().replace('payload_len >= out_cap',
                                                              'payload_len > out_cap'))
@@ -739,6 +761,15 @@ def selftest(root, arkade_root, image):
                     'reference': {'valid_partial_index': partial_checks['acceptance']},
                     'broken': {'invalid_partial_index': invalid_partial_checks['acceptance'],
                                'broad_partial_index': broad_partial_checks['acceptance']}}
+                quoted = parent / 'quoted-index'
+                shutil.copytree(good, quoted)
+                (quoted / 'indexes.sql').write_text(
+                    'CREATE INDEX "orders paid date" ON orders(status, ordered_on, customer_id);\n'
+                    'CREATE INDEX "order lines lookup" ON order_lines(order_id);\n')
+                quoted_checks, _ = grade_coding(task_id, quoted, image, arkade_root)
+                outcomes['sqlite-report-quoted-index'] = {
+                    'reference': {'acceptance': quoted_checks['acceptance']},
+                    'broken': {'invalid_partial_index': invalid_partial_checks['acceptance']}}
                 (good / 'indexes.sql').write_text(
                     'CREATE INDEX orders_date_status ON orders(ordered_on, status);\n'
                     'CREATE INDEX order_lines_order_id ON order_lines(order_id);\n')

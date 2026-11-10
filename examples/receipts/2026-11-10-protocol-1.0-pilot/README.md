@@ -16,11 +16,14 @@ conversation on all six tasks in this pilot.
 | C frame bounds | Pass | Pass | Pass |
 
 All receipts use suite SHA-256
-`f2409820d9f11a35b5c1fd258c295218d0fa0420ecf2e1f19a6d5bc969093aac`,
+`a832ddf234f989b32025e259b7049132026ee70d734b7649f66a1a8dc07f43ca`,
 temperature 0, top-p 1, seed 20261011, requested low reasoning, provider
 default thinking, a 32,768-token response cap, no turn cap, and a 1,800-second
-task deadline. All six tasks were rerun for each model on 10 November after
-the hidden acceptance and regression checks were strengthened. The controls
+task deadline. All six tasks were run for each model on 10 November. Their
+final workspaces were then reconstructed from hashed file diffs and regraded
+offline after further hidden-judge fixes. The `regrade` field records the
+source suite hash; **no new model inference** was performed for this judge
+revision. The controls
 reject premature exits from the Go and C acceptance tests, a migration that
 weakens target constraints or changes unrelated schema, one that rolls back
 the caller's transaction or mutates unrelated data on rerun, a report with

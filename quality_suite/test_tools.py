@@ -91,6 +91,12 @@ class PublicTestIsolationTests(unittest.TestCase):
         self.assertIn('suite.Acceptance.test_case',
                       result['terminal_events']['python_pass'])
 
+    def test_subtest_failure_keeps_parent_test_id(self):
+        output = ("FAIL: test_case (test_report.Case.test_case) "
+                  "(since='2026-10-01')\n")
+        events = runtime.terminal_events(io.BytesIO(output.encode()))
+        self.assertIn('test_report.Case.test_case', events['python_failed'])
+
 
 class ReviewGradeTests(unittest.TestCase):
     def review_calls(self, directory, partial=None):
@@ -151,6 +157,23 @@ class ReviewGradeTests(unittest.TestCase):
                 self.assertFalse(checks['causal_evidence'])
                 if kind == 'sound':
                     self.assertFalse(checks['real_issue'])
+
+    def test_denied_send_or_crash_cannot_pass_causal_review(self):
+        prefix = 'Submit unlocks. Close closes the jobs channel. '
+        for ending in ('Submit does not send, so there is no crash.',
+                       'Submit cannot enqueue, so it does not panic.',
+                       'Submit won\'t send, so there is no crash.',
+                       'Submit never sends and cannot crash.'):
+            with self.subTest(ending=ending):
+                self.assertFalse(advanced_evaluators.review_cause(
+                    'send-on-closed-channel race', prefix + ending))
+
+    def test_mutex_does_not_cover_send_is_valid_evidence(self):
+        evidence = ('Submit unlocks after checking the closed flag. Close '
+                    'closes jobs. Submit then sends to jobs and panics. '
+                    'The mutex does not cover the send.')
+        self.assertTrue(advanced_evaluators.review_cause(
+            'send-on-closed-channel race', evidence))
 
     def test_causal_review_accepts_equivalent_verbs(self):
         for verb in ('checks', 'sees', 'loads'):

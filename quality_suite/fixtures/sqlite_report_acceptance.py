@@ -47,10 +47,15 @@ class Acceptance(unittest.TestCase):
             'EXPLAIN QUERY PLAN ' + query, {'since': since})]
         lookups = []
         for detail in plan_rows:
-            match = re.search(r'\bSEARCH\b.*\bUSING (?:COVERING )?INDEX ([^\s(]+)\s*\(([^)]*)\)',
+            match = re.search(r'\bSEARCH\b.*\bUSING (?:COVERING )?INDEX (.+?)\s*\(([^()]*)\)',
                               detail)
             if match:
-                lookups.append((match.group(1), match.group(2)))
+                name = match.group(1).strip()
+                if (len(name) >= 2 and
+                        ((name[0] == name[-1] and name[0] in ('"', "'", '`'))
+                         or (name[0] == '[' and name[-1] == ']'))):
+                    name = name[1:-1]
+                lookups.append((name, match.group(2)))
         plan = '\n'.join(plan_rows)
         indexes = {row[1] for row in conn.execute('PRAGMA index_list(orders)')}
         definitions = dict(conn.execute(

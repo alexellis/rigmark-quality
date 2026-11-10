@@ -53,9 +53,10 @@ finding in its safe twin; its text-based causal-evidence check is a review
 calibration aid, not an executable proof. `go-export-boundary` checks that a
 cross-account request fails while legitimate owners retain access.
 `c-frame-bounds` checks malformed inputs with AddressSanitizer and UBSan.
-For the three repair tasks, the candidate's own regression test must pass
-with its fix and fail when the original broken source is restored. A compile
-error on the restored source does not count as a reproducer.
+For the three Go/C and two SQLite repair tasks, the candidate's own regression
+test must pass with its fix and fail when the original broken source is
+restored. A compile or import error on the restored source does not count as a
+reproducer.
 The review task remains experimental until its calibration is supported by
 multiple independent model runs.
 The review receipt records plain versus fenced JSON separately from the

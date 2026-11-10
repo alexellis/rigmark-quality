@@ -92,7 +92,9 @@ func TestRigmarkAcceptanceTenantBoundary(t *testing.T) {
 		if w.Code != http.StatusNotFound { t.Fatalf("%s %s: status %d", tc.user, tc.path, w.Code) }
 		if strings.Contains(w.Body.String(), "private") { t.Fatal("body leaked export") }
 	}
-	if got := test("", "/exports/jan").Code; got != http.StatusUnauthorized { t.Fatalf("unauthenticated: %d", got) }
+	unauthenticated := test("", "/exports/jan")
+	if unauthenticated.Code != http.StatusUnauthorized { t.Fatalf("unauthenticated: %d", unauthenticated.Code) }
+	if strings.Contains(unauthenticated.Body.String(), "private") { t.Fatal("unauthenticated body leaked export") }
 	for _, tc := range []struct{ user, path, content string }{
 		{"alice", "/exports/jan", "alice-private"},
 		{"bob", "/exports/feb", "bob-private"},
@@ -145,7 +147,10 @@ int main(void) {
 
     assert(decode_frame(valid, 0, guard, sizeof guard) == -1);
     assert(decode_frame(NULL, 0, guard, sizeof guard) == -1);
+    assert(decode_frame(NULL, 1, guard, sizeof guard) == -1);
+    assert(strcmp(guard, "unchanged") == 0);
     assert(decode_frame(valid, sizeof valid, NULL, 0) == -1);
+    assert(decode_frame(valid, sizeof valid, NULL, sizeof guard) == -1);
     assert(decode_frame(valid, sizeof valid, guard, 0) == -1);
     return 0;
 }
@@ -184,8 +189,10 @@ def review_cause(kind, evidence):
     if not review_kind(kind):
         return False
     text = evidence.casefold()
-    if (re.search(r'\b(?:does\s+not|doesn.t|cannot|never|no)\s+'
-                  r'(?:\w+\s+){0,2}panic\b', text)
+    denied_action = (r'\b(?:does\s+not|doesn.t|cannot|can.t|will\s+not|won.t|'
+                     r'never|no)\s+(?:send(?:s|ing)?|enqueue(?:s|ing)?|'
+                     r'panic(?:s|king|ked)?|crash(?:es|ed)?)\b')
+    if (re.search(denied_action, text)
             or re.search(r'\b(?:is|remains)\s+safe\b', text)):
         return False
     release = r'\b(?:unlocks?|releases?|drops?)\b(?:\s+(?:the\s+)?(?:mutex|lock))?'

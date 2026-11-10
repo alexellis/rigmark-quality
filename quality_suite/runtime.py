@@ -28,7 +28,7 @@ def terminal_events(log):
             events['go_pass'].add(match.group(1))
         if match := re.match(r'^\S+ \(([^)]+)\) \.\.\. ok$', line):
             events['python_pass'].add(match.group(1))
-        if match := re.match(r'^(?:FAIL|ERROR): \S+ \(([^)]+)\)$', line):
+        if match := re.match(r'^(?:FAIL|ERROR): \S+ \(([^)]+)\)(?: \(.*\))?$', line):
             events['python_failed'].add(match.group(1))
         if match := re.match(r'^Ran (\d+) tests? in ', line):
             events['unittest_ran'] = int(match.group(1))

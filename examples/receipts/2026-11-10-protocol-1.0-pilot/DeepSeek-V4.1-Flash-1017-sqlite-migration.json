@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "f2409820d9f11a35b5c1fd258c295218d0fa0420ecf2e1f19a6d5bc969093aac",
+  "suite_sha256": "a832ddf234f989b32025e259b7049132026ee70d734b7649f66a1a8dc07f43ca",
   "task_sha256": "9bf83219fb456e02b517e2c6b5c02fe40834d8953107bd50857371756ebf13ae",
   "request": {
     "temperature": 0,
@@ -60,6 +60,12 @@
   "passed": true,
   "failure": null,
   "review_output_format": null,
+  "regrade": {
+    "method": "offline_hidden_judge",
+    "source_suite_sha256": "f2409820d9f11a35b5c1fd258c295218d0fa0420ecf2e1f19a6d5bc969093aac",
+    "regraded_at": "2026-11-10T20:13:38.367543+00:00",
+    "model_inference_repeated": false
+  },
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with concurrent shutdown checks, full SQLite schema and result-column checks, complete-log terminal evidence, and equivalent race explanations. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "Model inference on 10 November 2026; recorded final workspaces were rebuilt from hashed diffs and regraded offline with revised hidden checks. No new model inference was made for this judge revision. Conversation, tool calls, file diffs, and endpoint details omitted."
 }
