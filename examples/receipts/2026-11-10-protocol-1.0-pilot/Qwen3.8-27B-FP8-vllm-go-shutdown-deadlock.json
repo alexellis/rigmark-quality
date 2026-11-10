@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "5da4b9af79e46f55983d6b6c7955c7963187892eb1c9a6ef91c7cf747737fdee",
+  "suite_sha256": "0edd3780ca7778af051b8aec37bf55f3de8e126f57711411804f11063733a2db",
   "task_sha256": "184bbff65bb0bead31d482eeb957ee203903683ae2fb4251fe10617985a39eba",
   "request": {
     "temperature": 0,
@@ -36,16 +36,16 @@
     "Qwen3.8-27B-FP8-vllm"
   ],
   "model_match": true,
-  "started_at": "2026-11-10T11:29:00.874570+00:00",
-  "finished_at": "2026-11-10T11:31:03.649690+00:00",
-  "elapsed_seconds": 122.8,
+  "started_at": "2026-11-10T15:54:01.966518+00:00",
+  "finished_at": "2026-11-10T15:56:14.192216+00:00",
+  "elapsed_seconds": 132.2,
   "usage": {
     "prompt_tokens": 43412,
-    "completion_tokens": 7145,
+    "completion_tokens": 7166,
     "reasoning_tokens": 0
   },
   "reasoning_diagnostics": {
-    "characters": 19705,
+    "characters": 19832,
     "repeated_trigram_fraction": 0.326,
     "loop_detected": false
   },
@@ -70,5 +70,5 @@
   "failure": null,
   "review_output_format": null,
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with strengthened acceptance checks. Conversation, tool calls, file diffs, and endpoint details omitted."
 }

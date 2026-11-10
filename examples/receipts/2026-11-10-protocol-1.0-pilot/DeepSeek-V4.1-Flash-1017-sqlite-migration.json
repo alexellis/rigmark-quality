@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "5da4b9af79e46f55983d6b6c7955c7963187892eb1c9a6ef91c7cf747737fdee",
+  "suite_sha256": "0edd3780ca7778af051b8aec37bf55f3de8e126f57711411804f11063733a2db",
   "task_sha256": "82c8400d98f8ff5fbc220e6ecb94e639fca3f47483bb6e1f4f1d6a7c3f5fcbf5",
   "request": {
     "temperature": 0,
@@ -29,34 +29,30 @@
     "DeepSeek-V4.1-Flash-1017",
     "DeepSeek-V4.1-Flash-1017",
     "DeepSeek-V4.1-Flash-1017",
-    "DeepSeek-V4.1-Flash-1017",
-    "DeepSeek-V4.1-Flash-1017",
-    "DeepSeek-V4.1-Flash-1017",
-    "DeepSeek-V4.1-Flash-1017",
     "DeepSeek-V4.1-Flash-1017"
   ],
   "model_match": true,
-  "started_at": "2026-11-10T11:31:04.375966+00:00",
-  "finished_at": "2026-11-10T11:32:35.685267+00:00",
-  "elapsed_seconds": 91.3,
+  "started_at": "2026-11-10T15:51:46.246063+00:00",
+  "finished_at": "2026-11-10T15:53:09.320377+00:00",
+  "elapsed_seconds": 83.1,
   "usage": {
-    "prompt_tokens": 94737,
-    "completion_tokens": 7181,
-    "reasoning_tokens": 2658
+    "prompt_tokens": 55195,
+    "completion_tokens": 7004,
+    "reasoning_tokens": 2798
   },
   "reasoning_diagnostics": {
-    "characters": 11799,
-    "repeated_trigram_fraction": 0.095,
+    "characters": 12543,
+    "repeated_trigram_fraction": 0.092,
     "loop_detected": false
   },
   "tool_diagnostics": {
-    "parsed_calls": 15,
+    "parsed_calls": 11,
     "invalid_calls": 0,
     "no_call_or_answer": false,
     "unfinished_after_tool": false,
     "unparsed_tool_markup": false
   },
-  "steps": 14,
+  "steps": 10,
   "checks": {
     "acceptance": true,
     "public_tests": true,
@@ -68,5 +64,5 @@
   "failure": null,
   "review_output_format": null,
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with strengthened acceptance checks. Conversation, tool calls, file diffs, and endpoint details omitted."
 }

@@ -3,6 +3,8 @@
 import json
 import re
 
+from . import advanced_tasks
+
 
 GO_DEADLOCK_ACCEPTANCE = r'''package shutdown
 
@@ -160,13 +162,26 @@ def grade_review(answer, calls):
                    and all(isinstance(v, str) for v in findings[0].values()))
     finding = findings[0] if one_finding else {}
     evidence = finding.get('evidence', '').casefold()
-    inspected = set()
+    required_files = {name: len(source.splitlines())
+                      for name, source in
+                      advanced_tasks.TASK_DEFINITIONS['go-concurrency-review']['files'].items()
+                      if name.endswith('.go')}
+    inspected_lines = {name: set() for name in required_files}
     for call in calls:
-        if call.get('name') in ('read_file', 'search_files'):
-            try:
-                inspected.add(json.loads(call['arguments']).get('path'))
-            except (ValueError, TypeError):
-                pass
+        if call.get('name') != 'read_file':
+            continue
+        try:
+            path = json.loads(call['arguments']).get('path')
+        except (KeyError, ValueError, TypeError):
+            continue
+        result = call.get('result')
+        if (path not in required_files or not isinstance(result, dict)
+                or result.get('error') or result.get('total_lines') != required_files[path]
+                or not isinstance(result.get('text'), str)):
+            continue
+        inspected_lines[path].update(
+            int(line) for line in re.findall(r'(?m)^(\d+): ', result['text'])
+            if 1 <= int(line) <= required_files[path])
     return {
         'json_contract': well_formed and one_finding,
         'real_issue': finding.get('file') == 'candidate_b/dispatcher.go'
@@ -175,8 +190,6 @@ def grade_review(answer, calls):
         'causal_evidence': len(evidence) >= 55 and 'submit' in evidence
                            and 'close' in evidence and 'send' in evidence
                            and ('channel' in evidence or 'jobs' in evidence),
-        'inspected_both': {'candidate_a/dispatcher.go',
-                           'candidate_a/worker.go',
-                           'candidate_b/dispatcher.go',
-                           'candidate_b/worker.go'} <= inspected,
+        'inspected_both': all(lines == set(range(1, required_files[path] + 1))
+                              for path, lines in inspected_lines.items()),
     }

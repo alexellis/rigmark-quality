@@ -1,6 +1,7 @@
 """Independent correctness and query-plan checks for the SQLite report."""
 from collections import defaultdict
 from pathlib import Path
+import re
 import sqlite3
 import unittest
 
@@ -33,13 +34,26 @@ class Acceptance(unittest.TestCase):
         self.assertEqual(got, want)
         conn.execute('ANALYZE')
         conn.execute('PRAGMA automatic_index = OFF')
-        plan = '\n'.join(row[3] for row in conn.execute(
-            'EXPLAIN QUERY PLAN ' + query, {'since': since}))
-        for table in ('orders', 'order_lines'):
-            indexes = [row[1] for row in conn.execute(f'PRAGMA index_list({table})')]
+        plan_rows = [row[3] for row in conn.execute(
+            'EXPLAIN QUERY PLAN ' + query, {'since': since})]
+        lookups = []
+        for detail in plan_rows:
+            match = re.search(r'\bSEARCH\b.*\bUSING (?:COVERING )?INDEX ([^\s(]+)\s*\(([^)]*)\)',
+                              detail)
+            if match:
+                lookups.append((match.group(1), match.group(2)))
+        plan = '\n'.join(plan_rows)
+        required = {
+            'orders': (r'\bstatus\s*=\s*\?', r'\bordered_on\s*>=?\s*\?'),
+            'order_lines': (r'\border_id\s*=\s*\?',),
+        }
+        for table, constraints in required.items():
+            indexes = {row[1] for row in conn.execute(f'PRAGMA index_list({table})')}
             self.assertTrue(indexes, table + ' lacks an index')
-            self.assertTrue(any(name in plan for name in indexes),
-                            table + ' has no indexed lookup in query plan:\n' + plan)
+            self.assertTrue(any(name in indexes and all(re.search(pattern, terms)
+                                                        for pattern in constraints)
+                                for name, terms in lookups),
+                            table + ' has no indexed lookup on required columns:\n' + plan)
 
     def test_large_repetitive_seed(self):
         self.check_case(317, 50000, 17, '2026-10-01')

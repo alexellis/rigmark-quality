@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "5da4b9af79e46f55983d6b6c7955c7963187892eb1c9a6ef91c7cf747737fdee",
+  "suite_sha256": "0edd3780ca7778af051b8aec37bf55f3de8e126f57711411804f11063733a2db",
   "task_sha256": "05364d05afbf46f3d131b2bc3b82309e406c4c2f87ff72b56c6ba72b00bbd7a6",
   "request": {
     "temperature": 0,
@@ -17,7 +17,7 @@
     "thinking": "default"
   },
   "arkade_revision": null,
-  "runtime_image_id": "sha256:047a9c305e557e5631298dd058b04ab40fbbc0713d05c844b7c528b55241e14e",
+  "runtime_image_id": "sha256:0a98fd299a801e51eec00b533e28b2aa986c59a200bda85ff794a5182096d031",
   "requested_model": "DeepSeek-V4.1-Flash-1017",
   "observed_models": [
     "DeepSeek-V4.1-Flash-1017",
@@ -25,8 +25,8 @@
     "DeepSeek-V4.1-Flash-1017"
   ],
   "model_match": true,
-  "started_at": "2026-11-09T10:53:52.953042+00:00",
-  "finished_at": "2026-11-09T10:54:06.734558+00:00",
+  "started_at": "2026-11-10T15:54:54.517418+00:00",
+  "finished_at": "2026-11-10T15:55:08.355082+00:00",
   "elapsed_seconds": 13.8,
   "usage": {
     "prompt_tokens": 3233,
@@ -59,5 +59,5 @@
   "failure": null,
   "review_output_format": "fenced_json",
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with strengthened acceptance checks. Conversation, tool calls, file diffs, and endpoint details omitted."
 }

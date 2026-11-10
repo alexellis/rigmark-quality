@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "5da4b9af79e46f55983d6b6c7955c7963187892eb1c9a6ef91c7cf747737fdee",
+  "suite_sha256": "0edd3780ca7778af051b8aec37bf55f3de8e126f57711411804f11063733a2db",
   "task_sha256": "478587d442637200564452e213c1be6a9a4fc5f23f75dc1dece4bb55c16d098b",
   "request": {
     "temperature": 0,
@@ -17,7 +17,7 @@
     "thinking": "default"
   },
   "arkade_revision": null,
-  "runtime_image_id": "sha256:047a9c305e557e5631298dd058b04ab40fbbc0713d05c844b7c528b55241e14e",
+  "runtime_image_id": "sha256:0a98fd299a801e51eec00b533e28b2aa986c59a200bda85ff794a5182096d031",
   "requested_model": "glm-5.3-flash",
   "observed_models": [
     "nvidia/GLM-5.3-Flash-NVFP4",
@@ -36,16 +36,16 @@
     "nvidia/GLM-5.3-Flash-NVFP4"
   ],
   "model_match": true,
-  "started_at": "2026-11-09T10:54:53.390709+00:00",
-  "finished_at": "2026-11-09T10:56:12.194262+00:00",
-  "elapsed_seconds": 78.8,
+  "started_at": "2026-11-10T15:54:07.450338+00:00",
+  "finished_at": "2026-11-10T15:55:31.228536+00:00",
+  "elapsed_seconds": 83.8,
   "usage": {
-    "prompt_tokens": 31724,
-    "completion_tokens": 824,
-    "reasoning_tokens": 22
+    "prompt_tokens": 31082,
+    "completion_tokens": 780,
+    "reasoning_tokens": 24
   },
   "reasoning_diagnostics": {
-    "characters": 122,
+    "characters": 134,
     "repeated_trigram_fraction": 0.0,
     "loop_detected": false
   },
@@ -70,5 +70,5 @@
   "failure": null,
   "review_output_format": null,
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with strengthened acceptance checks. Conversation, tool calls, file diffs, and endpoint details omitted."
 }

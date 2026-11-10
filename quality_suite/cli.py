@@ -391,9 +391,37 @@ def selftest(root, arkade_root, image):
             outcomes[task_id] = {'broken': broken_checks, 'broken_exit': broken_result['exit_code'],
                                  'reference': good_checks, 'reference_exit': good_result['exit_code'],
                                  'reference_output': good_result['output'][-2000:] if not all(good_checks.values()) else ''}
-    review_calls = [{'name': 'read_file', 'arguments': json.dumps({'path': name})}
-                    for name in ('candidate_a/dispatcher.go', 'candidate_a/worker.go',
-                                 'candidate_b/dispatcher.go', 'candidate_b/worker.go')]
+            if task_id == 'sqlite-report':
+                (good / 'indexes.sql').write_text(
+                    'CREATE INDEX orders_date_status ON orders(ordered_on, status);\n'
+                    'CREATE INDEX order_lines_order_id ON order_lines(order_id);\n')
+                weak_checks, _ = grade_coding(task_id, good, image, arkade_root)
+                outcomes['sqlite-report-weak-index'] = {
+                    'reference': {'valid_index': good_checks['acceptance']},
+                    'broken': {'weak_index': weak_checks['acceptance']}}
+    with tempfile.TemporaryDirectory(prefix='rigmark-review-control-') as directory:
+        review_workspace = make_workspace('go-concurrency-review', Path(directory), arkade_root)
+        review_box = tools.ToolBox('go-concurrency-review', review_workspace, image)
+        for name in ('candidate_a/dispatcher.go', 'candidate_a/worker.go',
+                     'candidate_b/dispatcher.go', 'candidate_b/worker.go'):
+            review_box.call('read_file', json.dumps({'path': name, 'offset': 0, 'limit': 250}))
+        review_calls = review_box.calls
+        failed_calls = [dict(call) for call in review_calls]
+        failed_calls[0]['result'] = {'error': 'file not found', 'kind': 'invalid_tool_call'}
+        partial_box = tools.ToolBox('go-concurrency-review', review_workspace, image)
+        for name in ('candidate_a/dispatcher.go', 'candidate_a/worker.go',
+                     'candidate_b/dispatcher.go', 'candidate_b/worker.go'):
+            partial_box.call('read_file', json.dumps({
+                'path': name, 'offset': 0,
+                'limit': 1 if name == 'candidate_b/dispatcher.go' else 250}))
+        outcomes['go-concurrency-review-inspection'] = {
+            'reference': {'full_reads': advanced_evaluators.grade_review(
+                json.dumps(advanced_tasks.REVIEW_REFERENCE), review_calls)['inspected_both']},
+            'broken': {
+                'failed_read': advanced_evaluators.grade_review(
+                    json.dumps(advanced_tasks.REVIEW_REFERENCE), failed_calls)['inspected_both'],
+                'partial_read': advanced_evaluators.grade_review(
+                    json.dumps(advanced_tasks.REVIEW_REFERENCE), partial_box.calls)['inspected_both']}}
     outcomes['go-concurrency-review'] = {
         'broken': advanced_evaluators.grade_review(
             json.dumps({'findings': [{'file': 'candidate_a/dispatcher.go',

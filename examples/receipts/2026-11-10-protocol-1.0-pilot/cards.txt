@@ -10,19 +10,19 @@
 ├─ TASKS ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │  TASK                        ARTEFACT  FINISHED  TIME     STOP             │
-│  sqlite-migration            yes       yes         91.3s normal            │
-│  sqlite-report               yes       yes         27.2s normal            │
-│  go-shutdown-deadlock        yes       yes         73.1s normal            │
+│  sqlite-migration            yes       yes         83.1s normal            │
+│  sqlite-report               yes       yes         27.1s normal            │
+│  go-shutdown-deadlock        yes       yes         78.1s normal            │
 │  go-concurrency-review       yes       yes         13.8s normal            │
-│  go-export-boundary          yes       yes         80.1s normal            │
-│  c-frame-bounds              yes       yes         21.9s normal            │
+│  go-export-boundary          yes       yes         85.2s normal            │
+│  c-frame-bounds              yes       yes         22.8s normal            │
 │                                                                            │
 │  Artefact and conversation completion are separate outcomes.               │
 │  Read the JSON receipt for checks, tool calls, and stop reasons.           │
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
-│  Tasks 6  ·  Suite 1.0  ·  SHA256 5da4b9af79e46f55…                        │
+│  Tasks 6  ·  Suite 1.0  ·  SHA256 0edd3780ca7778af…                        │
 │  Reasoning low  ·  Thinking default  ·  Output cap 32768                   │
 │  Turn cap none  ·  Time cap 1800s                                          │
 │                                                                            │
@@ -39,19 +39,19 @@
 ├─ TASKS ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │  TASK                        ARTEFACT  FINISHED  TIME     STOP             │
-│  sqlite-migration            yes       yes         95.0s normal            │
-│  sqlite-report               yes       yes         31.9s normal            │
-│  go-shutdown-deadlock        yes       yes        122.8s normal            │
-│  go-concurrency-review       yes       yes         61.1s normal            │
-│  go-export-boundary          yes       yes         65.6s normal            │
-│  c-frame-bounds              yes       yes         14.1s normal            │
+│  sqlite-migration            yes       yes        102.8s normal            │
+│  sqlite-report               yes       yes         32.8s normal            │
+│  go-shutdown-deadlock        yes       yes        132.2s normal            │
+│  go-concurrency-review       yes       yes         61.9s normal            │
+│  go-export-boundary          yes       yes         65.3s normal            │
+│  c-frame-bounds              yes       yes         14.2s normal            │
 │                                                                            │
 │  Artefact and conversation completion are separate outcomes.               │
 │  Read the JSON receipt for checks, tool calls, and stop reasons.           │
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
-│  Tasks 6  ·  Suite 1.0  ·  SHA256 5da4b9af79e46f55…                        │
+│  Tasks 6  ·  Suite 1.0  ·  SHA256 0edd3780ca7778af…                        │
 │  Reasoning low  ·  Thinking default  ·  Output cap 32768                   │
 │  Turn cap none  ·  Time cap 1800s                                          │
 │                                                                            │
@@ -68,19 +68,19 @@
 ├─ TASKS ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │  TASK                        ARTEFACT  FINISHED  TIME     STOP             │
-│  sqlite-migration            yes       yes         37.4s normal            │
-│  sqlite-report               yes       yes         15.3s normal            │
-│  go-shutdown-deadlock        yes       yes         47.4s normal            │
-│  go-concurrency-review       yes       yes         13.0s normal            │
-│  go-export-boundary          yes       yes         78.8s normal            │
-│  c-frame-bounds              yes       yes         12.0s normal            │
+│  sqlite-migration            yes       yes         24.3s normal            │
+│  sqlite-report               yes       yes         15.5s normal            │
+│  go-shutdown-deadlock        yes       yes         92.2s normal            │
+│  go-concurrency-review       yes       yes          9.2s normal            │
+│  go-export-boundary          yes       yes         83.8s normal            │
+│  c-frame-bounds              yes       yes         17.2s normal            │
 │                                                                            │
 │  Artefact and conversation completion are separate outcomes.               │
 │  Read the JSON receipt for checks, tool calls, and stop reasons.           │
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
-│  Tasks 6  ·  Suite 1.0  ·  SHA256 5da4b9af79e46f55…                        │
+│  Tasks 6  ·  Suite 1.0  ·  SHA256 0edd3780ca7778af…                        │
 │  Reasoning low  ·  Thinking default  ·  Output cap 32768                   │
 │  Turn cap none  ·  Time cap 1800s                                          │
 │                                                                            │

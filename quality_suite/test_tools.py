@@ -27,10 +27,25 @@ class FileSearchTests(unittest.TestCase):
 
 
 class ReviewGradeTests(unittest.TestCase):
+    def review_calls(self, directory, partial=None):
+        root = Path(directory)
+        files = advanced_tasks.TASK_DEFINITIONS['go-concurrency-review']['files']
+        for name, source in files.items():
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(source)
+        box = ToolBox('go-concurrency-review', root, 'unused')
+        for name in files:
+            if name.endswith('.go'):
+                box.call('read_file', json.dumps({
+                    'path': name, 'offset': 0,
+                    'limit': 1 if name == partial else 250}))
+        return box.calls
+
     def test_formatting_does_not_erase_correct_diagnosis(self):
-        calls = [{'name': 'read_file', 'arguments': json.dumps({'path': name})}
-                 for name in advanced_tasks.TASK_DEFINITIONS['go-concurrency-review']['files']
-                 if name.endswith('.go')]
+        with tempfile.TemporaryDirectory() as directory:
+            calls = self.review_calls(directory)
+            self.assertTrue(self.grade_reference(calls)['inspected_both'])
         answer = json.dumps(advanced_tasks.REVIEW_REFERENCE)
         for variant, expected_format in (
             (answer, 'plain_json'),
@@ -41,13 +56,24 @@ class ReviewGradeTests(unittest.TestCase):
             with self.subTest(expected_format=expected_format):
                 self.assertEqual(advanced_evaluators.review_format(variant),
                                  expected_format)
-                self.assertTrue(all(advanced_evaluators.grade_review(
-                    variant, calls).values()))
+                self.assertTrue(all(advanced_evaluators.grade_review(variant, calls).values()))
+
+    def grade_reference(self, calls):
+        return advanced_evaluators.grade_review(
+            json.dumps(advanced_tasks.REVIEW_REFERENCE), calls)
+
+    def test_failed_and_partial_reads_do_not_count(self):
+        with tempfile.TemporaryDirectory() as directory:
+            calls = self.review_calls(directory)
+            failed = [dict(call) for call in calls]
+            failed[0]['result'] = {'error': 'file not found', 'kind': 'invalid_tool_call'}
+            self.assertFalse(self.grade_reference(failed)['inspected_both'])
+            partial = self.review_calls(directory, partial='candidate_b/dispatcher.go')
+            self.assertFalse(self.grade_reference(partial)['inspected_both'])
 
     def test_false_positive_fails(self):
-        calls = [{'name': 'read_file', 'arguments': json.dumps({'path': name})}
-                 for name in advanced_tasks.TASK_DEFINITIONS['go-concurrency-review']['files']
-                 if name.endswith('.go')]
+        with tempfile.TemporaryDirectory() as directory:
+            calls = self.review_calls(directory)
         answer = json.dumps({'findings': [{
             'file': 'candidate_a/dispatcher.go', 'kind': 'race',
             'evidence': 'Submit and Close can race on the channel.'}],
