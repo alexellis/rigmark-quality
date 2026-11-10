@@ -179,6 +179,9 @@ def review_format(answer):
 
 def review_kind(kind):
     words = set(re.findall(r'[a-z]+', kind.casefold()))
+    if words & {'no', 'not', 'never', 'without', 'impossible', 'prevented',
+                'prevents', 'avoided', 'avoids', 'safe', 'sound'}:
+        return False
     return (('race' in words and bool(words & {'toctou', 'shutdown'})) or
             (bool(words & {'channel', 'jobs', 'queue'}) and
              bool(words & {'close', 'closed', 'closing', 'shut'}) and
@@ -193,7 +196,9 @@ def review_cause(kind, evidence):
                      r'never|no)\s+(?:send(?:s|ing)?|enqueue(?:s|ing)?|'
                      r'panic(?:s|king|ked)?|crash(?:es|ed)?)\b')
     if (re.search(denied_action, text)
-            or re.search(r'\b(?:is|remains)\s+safe\b', text)):
+            or re.search(r'\b(?:is|remains)\s+(?:safe|correct)\b', text)
+            or re.search(r'\bimpossible\b.{0,80}\b(?:send|enqueue|panic|crash)', text)
+            or re.search(r'\b(?:prevents?|avoids?)\b.{0,80}\b(?:send|enqueue|panic|crash)', text)):
         return False
     release = r'\b(?:unlocks?|releases?|drops?)\b(?:\s+(?:the\s+)?(?:mutex|lock))?'
     close = (r'\bclose\b.{0,80}?\b(?:closes?|shuts?(?:\s+down)?|terminates?)\s*'

@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "a832ddf234f989b32025e259b7049132026ee70d734b7649f66a1a8dc07f43ca",
+  "suite_sha256": "41f3094dc0f964b396b7ad1162b26a17a92038c2d57c889ee56c807ce033d97b",
   "task_sha256": "478587d442637200564452e213c1be6a9a4fc5f23f75dc1dece4bb55c16d098b",
   "request": {
     "temperature": 0,
@@ -70,7 +70,7 @@
   "regrade": {
     "method": "offline_hidden_judge",
     "source_suite_sha256": "f2409820d9f11a35b5c1fd258c295218d0fa0420ecf2e1f19a6d5bc969093aac",
-    "regraded_at": "2026-11-10T20:13:38.366609+00:00",
+    "regraded_at": "2026-11-10T20:35:21.327294+00:00",
     "model_inference_repeated": false
   },
   "receipt_kind": "public_summary",

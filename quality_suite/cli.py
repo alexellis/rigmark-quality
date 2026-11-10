@@ -106,6 +106,7 @@ def hidden_python_suite_passed(result, task_id):
     expected = {
         'sqlite-migration': ('test_caller_can_roll_back_migration',
                              'test_conflicting_metadata_rolls_back_everything',
+                             'test_empty_legacy_schema_migrates',
                              'test_every_line_and_other_table_survive'),
         'sqlite-report': ('test_different_seed_and_date',
                           'test_large_repetitive_seed'),
@@ -636,6 +637,36 @@ def selftest(root, arkade_root, image):
                                   'fails_old': good_checks['regression_fails_on_original']},
                     'broken': {'comment_only': comment_checks['regression_test_added']}}
             if task_id == 'sqlite-migration':
+                forged = parent / 'sqlite-forged-child-success'
+                shutil.copytree(good, forged)
+                source = forged / 'migration.py'
+                source.write_text(source.read_text().replace(
+                    'def migrate(conn):\n',
+                    'def migrate(conn):\n'
+                    '    import os\n'
+                    '    if "rigmark-migration-" in conn.execute("PRAGMA database_list").fetchone()[2]:\n'
+                    '        print("Ran 4 tests in 0.01s\\n\\nOK")\n'
+                    '        os._exit(0)\n', 1))
+                forged_checks, _ = grade_coding(task_id, forged, image, arkade_root)
+                outcomes['sqlite-migration-forged-child-success'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_tests': forged_checks['public_tests']},
+                    'broken': {'acceptance': forged_checks['acceptance']}}
+                empty = parent / 'sqlite-empty-skip'
+                shutil.copytree(good, empty)
+                source = empty / 'migration.py'
+                source.write_text(source.read_text().replace(
+                    'def migrate(conn):\n',
+                    'def migrate(conn):\n'
+                    '    if "invoice_lines" in {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type=\'table\'")} and not conn.execute("SELECT 1 FROM invoice_lines LIMIT 1").fetchone():\n'
+                    '        return\n', 1))
+                (empty / 'test_migration.py').write_text(
+                    tasks.TASKS[task_id]['files']['test_migration.py'])
+                empty_checks, _ = grade_coding(task_id, empty, image, arkade_root)
+                outcomes['sqlite-migration-empty-skip'] = {
+                    'reference': {'acceptance': good_checks['acceptance'],
+                                  'public_tests': empty_checks['public_tests']},
+                    'broken': {'acceptance': empty_checks['acceptance']}}
                 early_exit = parent / 'sqlite-import-exit'
                 shutil.copytree(good, early_exit)
                 source = early_exit / 'migration.py'
@@ -696,10 +727,13 @@ def selftest(root, arkade_root, image):
                 leaked = parent / 'unauthenticated-leak'
                 shutil.copytree(good, leaked)
                 source = leaked / 'server.go'
-                source.write_text(source.read_text().replace(
-                    'http.Error(w, "unauthorised", http.StatusUnauthorized); return',
+                contents = source.read_text()
+                unauthorised = 'http.Error(w, "unauthorised", http.StatusUnauthorized)'
+                assert unauthorised in contents
+                source.write_text(contents.replace(
+                    unauthorised,
                     'w.WriteHeader(http.StatusUnauthorized); '
-                    'w.Write([]byte("alice-private")); return'))
+                    'w.Write([]byte("alice-private"))'))
                 leak_checks, _ = grade_coding(task_id, leaked, image, arkade_root)
                 outcomes['go-export-unauthenticated-leak'] = {
                     'reference': {'acceptance': good_checks['acceptance']},
@@ -770,10 +804,12 @@ def selftest(root, arkade_root, image):
                 outcomes['sqlite-report-quoted-index'] = {
                     'reference': {'acceptance': quoted_checks['acceptance']},
                     'broken': {'invalid_partial_index': invalid_partial_checks['acceptance']}}
-                (good / 'indexes.sql').write_text(
+                weak = parent / 'weak-index'
+                shutil.copytree(good, weak)
+                (weak / 'indexes.sql').write_text(
                     'CREATE INDEX orders_date_status ON orders(ordered_on, status);\n'
                     'CREATE INDEX order_lines_order_id ON order_lines(order_id);\n')
-                weak_checks, _ = grade_coding(task_id, good, image, arkade_root)
+                weak_checks, _ = grade_coding(task_id, weak, image, arkade_root)
                 outcomes['sqlite-report-weak-index'] = {
                     'reference': {'valid_index': good_checks['acceptance']},
                     'broken': {'weak_index': weak_checks['acceptance']}}

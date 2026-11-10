@@ -29,15 +29,19 @@ A task can have correct code and an unfinished conversation.
 
 Eighteen tasks use the restricted typed-tool harness. Coding checks run in an
 offline Docker container with a read-only root, resource limits, and no
-Docker socket. That interface is a significant harness choice; its results
+Docker socket. Candidate output is capped at 4 MiB within the task deadline.
+That interface is a significant harness choice; its results
 are not ordinary terminal-agent results. The document and refusal tasks
 remain exploratory. The refusal check is a smoke test, not a cyber benchmark.
 The agent's `run_tests` works on a disposable copy, so test-time writes cannot
 alter protected workspace files. Withheld Go, C, and SQLite checks are
-compiled before their source is removed from the execution copy; the parent
-also requires terminal test evidence. These measures detect premature exits
-and accidental fixture tampering. They are not a hardened defence against
-code deliberately written to reverse engineer and forge the judge.
+compiled before their source is removed from the execution copy. The SQLite
+migration fixture runs candidate code in a child process and checks database
+state in its parent; terminal output from the child is discarded. The parent
+also requires terminal test evidence from its own checks. These measures
+detect premature exits and accidental fixture tampering. They are not a
+hardened defence against code deliberately written to reverse engineer the
+judge.
 
 Two SQLite tasks extend that harness. `sqlite-migration` checks preservation
 of all invoice lines, safe reruns, rollback on metadata conflicts, and

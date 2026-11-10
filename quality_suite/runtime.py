@@ -3,27 +3,28 @@ import json
 import os
 from pathlib import Path
 import re
+import selectors
 import signal
 import subprocess
-import tempfile
+import time
 import uuid
 
 DEFAULT_IMAGE = 'rigmark-quality-runtime:0.4'
 
 
-def terminal_events(log):
-    """Retain grading events from the entire log without retaining the log."""
-    log.seek(0)
-    events = {'go_pass': set(), 'python_pass': set(), 'python_failed': set(),
-              'unittest_ran': None, 'unittest_ok': False,
-              'source_error': False, 'build_failed': False,
-              'c_compile_error': False}
-    pending = b''
+class EventCollector:
+    def __init__(self):
+        self.events = {'go_pass': set(), 'python_pass': set(), 'python_failed': set(),
+                       'unittest_ran': None, 'unittest_ok': False,
+                       'source_error': False, 'build_failed': False,
+                       'c_compile_error': False}
+        self.pending = b''
 
-    def visit(raw):
+    def visit(self, raw):
         if len(raw) > 8192:
             return
         line = raw.decode('utf-8', errors='replace').strip()
+        events = self.events
         if match := re.match(r'^--- PASS: (\S+) \(', line):
             events['go_pass'].add(match.group(1))
         if match := re.match(r'^\S+ \(([^)]+)\) \.\.\. ok$', line):
@@ -41,41 +42,80 @@ def terminal_events(log):
         events['c_compile_error'] |= bool(re.search(r':\d+:\d+: error:|undefined reference',
                                                     line.lower()))
 
-    while chunk := log.read(65536):
-        lines = (pending + chunk).split(b'\n')
-        pending = lines.pop()[-8192:]
+    def feed(self, chunk):
+        lines = (self.pending + chunk).split(b'\n')
+        self.pending = lines.pop()[-8192:]
         for line in lines:
-            visit(line)
-    if pending:
-        visit(pending)
-    return {key: sorted(value) if isinstance(value, set) else value
-            for key, value in events.items()}
+            self.visit(line)
+
+    def finish(self):
+        if self.pending:
+            self.visit(self.pending)
+        return {key: sorted(value) if isinstance(value, set) else value
+                for key, value in self.events.items()}
 
 
-def capture(command, timeout=60):
-    # A file avoids unbounded RAM use if candidate code prints continuously.
-    with tempfile.TemporaryFile() as log:
-        p = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
-        timed_out = False
+def terminal_events(log):
+    """Extract grading events from a bounded, already completed log."""
+    log.seek(0)
+    collector = EventCollector()
+    while chunk := log.read(65536):
+        collector.feed(chunk)
+    return collector.finish()
+
+
+def capture(command, timeout=60, max_output_bytes=4 * 1024 * 1024):
+    """Bound wall time, output bytes, and retained output during execution."""
+    p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         start_new_session=True, bufsize=0)
+    collector = EventCollector()
+    head, tail = bytearray(), bytearray()
+    size = 0
+    timed_out = False
+    output_limited = False
+    deadline = time.monotonic() + timeout
+    with selectors.DefaultSelector() as selector:
+        selector.register(p.stdout, selectors.EVENT_READ)
+        while selector.get_map():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                timed_out = True
+                break
+            if not selector.select(remaining):
+                timed_out = True
+                break
+            chunk = os.read(p.stdout.fileno(), 65536)
+            if not chunk:
+                selector.unregister(p.stdout)
+                break
+            size += len(chunk)
+            if size > max_output_bytes:
+                output_limited = True
+                break
+            collector.feed(chunk)
+            if len(head) < 32768:
+                head.extend(chunk[:32768 - len(head)])
+            tail.extend(chunk)
+            if len(tail) > 32768:
+                del tail[:-32768]
+    if timed_out or output_limited:
         try:
-            p.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            timed_out = True
             os.killpg(p.pid, signal.SIGKILL)
-            p.wait()
-        evidence = terminal_events(log)
-        size = log.seek(0, os.SEEK_END)
-        if size <= 65536:
-            log.seek(0)
-            output = log.read().decode('utf-8', errors='replace')
-        else:
-            log.seek(0)
-            head = log.read(32768).decode('utf-8', errors='replace')
-            log.seek(size - 32768)
-            tail = log.read().decode('utf-8', errors='replace')
-            output = head + '\n[intermediate output omitted]\n' + tail
-        return {'exit_code': p.returncode, 'timeout': timed_out,
-                'output': output, 'terminal_events': evidence}
+        except ProcessLookupError:
+            pass
+    p.wait()
+    p.stdout.close()
+    output = (bytes(head).decode('utf-8', errors='replace')
+              if size <= 32768 else
+              bytes(head).decode('utf-8', errors='replace') +
+              '\n[intermediate output omitted]\n' +
+              bytes(tail).decode('utf-8', errors='replace'))
+    if output_limited:
+        output += '\n[output limit exceeded]\n'
+    return {'exit_code': -1 if output_limited else p.returncode,
+            'timeout': timed_out,
+            'output_limited': output_limited, 'output': output,
+            'terminal_events': collector.finish()}
 
 
 def image_id(image):

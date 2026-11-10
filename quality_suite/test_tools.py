@@ -97,6 +97,14 @@ class PublicTestIsolationTests(unittest.TestCase):
         events = runtime.terminal_events(io.BytesIO(output.encode()))
         self.assertIn('test_report.Case.test_case', events['python_failed'])
 
+    def test_unbounded_candidate_output_is_stopped(self):
+        result = runtime.capture(
+            ['python3', '-c', 'print("x" * 1000000)'],
+            max_output_bytes=8192)
+        self.assertTrue(result['output_limited'])
+        self.assertNotEqual(result['exit_code'], 0)
+        self.assertLess(len(result['output']), 70000)
+
 
 class ReviewGradeTests(unittest.TestCase):
     def review_calls(self, directory, partial=None):
@@ -167,6 +175,14 @@ class ReviewGradeTests(unittest.TestCase):
             with self.subTest(ending=ending):
                 self.assertFalse(advanced_evaluators.review_cause(
                     'send-on-closed-channel race', prefix + ending))
+
+    def test_negated_kind_and_impossible_consequence_fail(self):
+        evidence = ('Submit unlocks the mutex. Close closes the jobs channel. '
+                    'It is impossible for Submit to send afterward or panic, '
+                    'so candidate B remains correct.')
+        for kind in ('no_send_on_closed_channel', 'send-on-closed-channel race'):
+            with self.subTest(kind=kind):
+                self.assertFalse(advanced_evaluators.review_cause(kind, evidence))
 
     def test_mutex_does_not_cover_send_is_valid_evidence(self):
         evidence = ('Submit unlocks after checking the closed flag. Close '
