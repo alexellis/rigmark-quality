@@ -71,6 +71,21 @@ class ReviewGradeTests(unittest.TestCase):
             partial = self.review_calls(directory, partial='candidate_b/dispatcher.go')
             self.assertFalse(self.grade_reference(partial)['inspected_both'])
 
+    def test_safe_claim_cannot_pass_causal_review(self):
+        evidence = ('Submit reads wasClosed=false, then unlocks. Close closes jobs. '
+                    'Submit sends to the channel, but candidate B is safe and '
+                    'does not panic.')
+        for kind in ('sound', 'send_on_closed_channel'):
+            with self.subTest(kind=kind):
+                answer = json.dumps({'findings': [{
+                    'file': 'candidate_b/dispatcher.go', 'kind': kind,
+                    'evidence': evidence}],
+                    'clear': ['candidate_a/dispatcher.go']})
+                checks = advanced_evaluators.grade_review(answer, [])
+                self.assertFalse(checks['causal_evidence'])
+                if kind == 'sound':
+                    self.assertFalse(checks['real_issue'])
+
     def test_false_positive_fails(self):
         with tempfile.TemporaryDirectory() as directory:
             calls = self.review_calls(directory)

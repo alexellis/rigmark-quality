@@ -393,6 +393,6 @@ def reference(task_id, workspace):
 
 REVIEW_REFERENCE = {
     'findings': [{'file': 'candidate_b/dispatcher.go', 'kind': 'send_on_closed_channel',
-                  'evidence': 'Submit reads closed under the mutex, then unlocks before sending to jobs. Close can close that channel between the check and send, so Submit panics.'}],
+                  'evidence': 'Submit reads closed == false under the mutex, then unlocks. Close closes jobs before Submit sends to jobs, so Submit panics on a closed channel.'}],
     'clear': ['candidate_a/dispatcher.go'],
 }

@@ -142,6 +142,31 @@ def review_format(answer):
         return 'other'
 
 
+def review_cause(kind, evidence):
+    if not re.search(r'\bsend[\s_-]+on[\s_-]+closed[\s_-]+channel\b',
+                     kind.casefold()):
+        return False
+    text = evidence.casefold()
+    if (re.search(r'\b(?:does\s+not|doesn.t|cannot|never|no)\s+'
+                  r'(?:\w+\s+){0,2}panic\b', text)
+            or re.search(r'\b(?:is|remains)\s+safe\b', text)):
+        return False
+    position = 0
+    for pattern in (
+            r'\bsubmit\b',
+            r'\b(?:reads?|observes?)\s+(?:d\.)?(?:wasclosed|closed)\s*(?:==|=)\s*false\b',
+            r'\b(?:unlocks?|releases?)\b',
+            r'\bclose\b',
+            r'\bcloses?\s*\(?\s*(?:d\.)?jobs\b',
+            r'(?:\b(?:d\.)?jobs\s*<-\s*job\b|\bsends?\b)',
+            r'\bpanic(?:s|king|ked)?\b'):
+        match = re.search(pattern, text[position:])
+        if not match:
+            return False
+        position += match.end()
+    return True
+
+
 def grade_review(answer, calls):
     raw = answer.strip()
     try:
@@ -161,7 +186,7 @@ def grade_review(answer, calls):
                    and set(findings[0]) == {'file', 'kind', 'evidence'}
                    and all(isinstance(v, str) for v in findings[0].values()))
     finding = findings[0] if one_finding else {}
-    evidence = finding.get('evidence', '').casefold()
+    evidence = finding.get('evidence', '')
     required_files = {name: len(source.splitlines())
                       for name, source in
                       advanced_tasks.TASK_DEFINITIONS['go-concurrency-review']['files'].items()
@@ -185,11 +210,11 @@ def grade_review(answer, calls):
     return {
         'json_contract': well_formed and one_finding,
         'real_issue': finding.get('file') == 'candidate_b/dispatcher.go'
-                      and bool(finding.get('kind', '').strip()),
+                      and bool(re.search(r'\bsend[\s_-]+on[\s_-]+closed[\s_-]+channel\b',
+                                         finding.get('kind', '').casefold())),
         'no_false_positive': clear == ['candidate_a/dispatcher.go'],
-        'causal_evidence': len(evidence) >= 55 and 'submit' in evidence
-                           and 'close' in evidence and 'send' in evidence
-                           and ('channel' in evidence or 'jobs' in evidence),
+        'causal_evidence': len(evidence) >= 55
+                           and review_cause(finding.get('kind', ''), evidence),
         'inspected_both': all(lines == set(range(1, required_files[path] + 1))
                               for path, lines in inspected_lines.items()),
     }

@@ -16,12 +16,13 @@ conversation on all six tasks in this pilot.
 | C frame bounds | Pass | Pass | Pass |
 
 All receipts use suite SHA-256
-`0edd3780ca7778af051b8aec37bf55f3de8e126f57711411804f11063733a2db`,
+`0246ea126e8d043fc27915800439e95e384ad8e9b0b287b3f9bc9722f24547f7`,
 temperature 0, top-p 1, seed 20261011, requested low reasoning, provider
 default thinking, a 32,768-token response cap, no turn cap, and a 1,800-second
-task deadline. All eighteen tasks were rerun on 10 November after the SQLite
-query-plan and Go review inspection checks were strengthened. The new controls
-reject an incorrectly ordered index and failed or partial file reads.
+task deadline. All six tasks were rerun for each model on 10 November after
+the SQLite query-plan and Go review checks were strengthened. The new controls
+reject an incorrectly ordered index, failed or partial file reads, and a
+review that calls the unsafe dispatcher sound.
 
 GLM 5.3 Flash NVFP4 ran through Toilgate on four DGX Sparks. DeepSeek V4.1
 Flash 1017 used Mia's 2.9 bpw EXL3 TensorFold recipe directly on two DGX
