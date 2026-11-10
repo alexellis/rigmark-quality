@@ -4,8 +4,8 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "15f464151c933f8d2c7067f9aa25cd8add1b05a689c687096cc25c163162140c",
-  "task_sha256": "82c8400d98f8ff5fbc220e6ecb94e639fca3f47483bb6e1f4f1d6a7c3f5fcbf5",
+  "suite_sha256": "f2409820d9f11a35b5c1fd258c295218d0fa0420ecf2e1f19a6d5bc969093aac",
+  "task_sha256": "9bf83219fb456e02b517e2c6b5c02fe40834d8953107bd50857371756ebf13ae",
   "request": {
     "temperature": 0,
     "top_p": 1,
@@ -28,33 +28,30 @@
     "nvidia/GLM-5.3-Flash-NVFP4",
     "nvidia/GLM-5.3-Flash-NVFP4",
     "nvidia/GLM-5.3-Flash-NVFP4",
-    "nvidia/GLM-5.3-Flash-NVFP4",
-    "nvidia/GLM-5.3-Flash-NVFP4",
-    "nvidia/GLM-5.3-Flash-NVFP4",
     "nvidia/GLM-5.3-Flash-NVFP4"
   ],
   "model_match": true,
-  "started_at": "2026-11-10T19:23:13.433076+00:00",
-  "finished_at": "2026-11-10T19:23:47.511506+00:00",
-  "elapsed_seconds": 34.1,
+  "started_at": "2026-11-10T19:50:34.805533+00:00",
+  "finished_at": "2026-11-10T19:51:10.417592+00:00",
+  "elapsed_seconds": 35.6,
   "usage": {
-    "prompt_tokens": 37988,
-    "completion_tokens": 2605,
-    "reasoning_tokens": 66
+    "prompt_tokens": 26535,
+    "completion_tokens": 2919,
+    "reasoning_tokens": 177
   },
   "reasoning_diagnostics": {
-    "characters": 351,
-    "repeated_trigram_fraction": 0.0,
+    "characters": 969,
+    "repeated_trigram_fraction": 0.029,
     "loop_detected": false
   },
   "tool_diagnostics": {
-    "parsed_calls": 13,
+    "parsed_calls": 10,
     "invalid_calls": 0,
     "no_call_or_answer": false,
     "unfinished_after_tool": false,
     "unparsed_tool_markup": false
   },
-  "steps": 12,
+  "steps": 9,
   "checks": {
     "acceptance": true,
     "public_tests": true,
@@ -67,5 +64,5 @@
   "failure": null,
   "review_output_format": null,
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with isolated public tests and hardened hidden acceptance, transaction, boundary, and regression checks. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with concurrent shutdown checks, full SQLite schema and result-column checks, complete-log terminal evidence, and equivalent race explanations. Conversation, tool calls, file diffs, and endpoint details omitted."
 }

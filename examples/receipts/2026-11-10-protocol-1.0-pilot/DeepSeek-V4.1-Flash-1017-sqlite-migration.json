@@ -4,8 +4,8 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "15f464151c933f8d2c7067f9aa25cd8add1b05a689c687096cc25c163162140c",
-  "task_sha256": "82c8400d98f8ff5fbc220e6ecb94e639fca3f47483bb6e1f4f1d6a7c3f5fcbf5",
+  "suite_sha256": "f2409820d9f11a35b5c1fd258c295218d0fa0420ecf2e1f19a6d5bc969093aac",
+  "task_sha256": "9bf83219fb456e02b517e2c6b5c02fe40834d8953107bd50857371756ebf13ae",
   "request": {
     "temperature": 0,
     "top_p": 1,
@@ -25,39 +25,30 @@
     "DeepSeek-V4.1-Flash-1017",
     "DeepSeek-V4.1-Flash-1017",
     "DeepSeek-V4.1-Flash-1017",
-    "DeepSeek-V4.1-Flash-1017",
-    "DeepSeek-V4.1-Flash-1017",
-    "DeepSeek-V4.1-Flash-1017",
-    "DeepSeek-V4.1-Flash-1017",
-    "DeepSeek-V4.1-Flash-1017",
-    "DeepSeek-V4.1-Flash-1017",
-    "DeepSeek-V4.1-Flash-1017",
-    "DeepSeek-V4.1-Flash-1017",
-    "DeepSeek-V4.1-Flash-1017",
     "DeepSeek-V4.1-Flash-1017"
   ],
   "model_match": true,
-  "started_at": "2026-11-10T19:23:13.432162+00:00",
-  "finished_at": "2026-11-10T19:24:58.380637+00:00",
-  "elapsed_seconds": 104.9,
+  "started_at": "2026-11-10T19:50:34.805044+00:00",
+  "finished_at": "2026-11-10T19:51:24.051930+00:00",
+  "elapsed_seconds": 49.2,
   "usage": {
-    "prompt_tokens": 109846,
-    "completion_tokens": 8020,
-    "reasoning_tokens": 3383
+    "prompt_tokens": 18995,
+    "completion_tokens": 4163,
+    "reasoning_tokens": 823
   },
   "reasoning_diagnostics": {
-    "characters": 15015,
-    "repeated_trigram_fraction": 0.1,
+    "characters": 3710,
+    "repeated_trigram_fraction": 0.04,
     "loop_detected": false
   },
   "tool_diagnostics": {
-    "parsed_calls": 16,
+    "parsed_calls": 7,
     "invalid_calls": 0,
     "no_call_or_answer": false,
     "unfinished_after_tool": false,
     "unparsed_tool_markup": false
   },
-  "steps": 15,
+  "steps": 6,
   "checks": {
     "acceptance": true,
     "public_tests": true,
@@ -70,5 +61,5 @@
   "failure": null,
   "review_output_format": null,
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with isolated public tests and hardened hidden acceptance, transaction, boundary, and regression checks. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with concurrent shutdown checks, full SQLite schema and result-column checks, complete-log terminal evidence, and equivalent race explanations. Conversation, tool calls, file diffs, and endpoint details omitted."
 }

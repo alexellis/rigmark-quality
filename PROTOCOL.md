@@ -40,10 +40,11 @@ and accidental fixture tampering. They are not a hardened defence against
 code deliberately written to reverse engineer and forge the judge.
 
 Two SQLite tasks extend that harness. `sqlite-migration` checks preservation
-of all invoice lines, safe reruns, and rollback of conflicting or caller-owned
-transactions. `sqlite-report` checks exact results on fresh data and whether
-SQLite uses explicit indexes for filtered orders and joined lines. The latter
-is a query-design diagnostic, not a cross-machine timing benchmark.
+of all invoice lines, safe reruns, rollback on metadata conflicts, and
+preservation of caller-owned transactions. `sqlite-report` checks exact
+results on fresh data and whether SQLite uses explicit indexes for filtered
+orders and joined lines. The latter is a query-design diagnostic, not a
+cross-machine timing benchmark.
 
 Four harder diagnostics extend the harness. `go-shutdown-deadlock` grades a
 forced shutdown interleaving and preserves accepted work. The paired

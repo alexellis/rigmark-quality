@@ -1,6 +1,7 @@
 """Independent checks injected after the SQLite migration attempt."""
 import sqlite3
 import unittest
+from collections import Counter
 
 from migration import migrate
 from schema import LEGACY_SCHEMA
@@ -22,12 +23,42 @@ def state(conn):
     schema = conn.execute(
         "SELECT type, name, tbl_name, sql FROM sqlite_master "
         "ORDER BY type, name").fetchall()
-    rows = {table: conn.execute(f'SELECT * FROM "{table}" ORDER BY rowid').fetchall()
+    rows = {table: Counter(conn.execute(f'SELECT * FROM "{table}"').fetchall())
             for table in tables(conn)}
     return (schema, rows, conn.execute('PRAGMA user_version').fetchone()[0],
             conn.execute('PRAGMA foreign_keys').fetchone()[0],
             conn.execute('PRAGMA foreign_key_list(invoice_items)').fetchall()
             if 'invoice_items' in rows else [])
+
+
+def unrelated_state(conn):
+    names = tables(conn) - {'invoice_lines', 'invoices', 'invoice_items'}
+    objects = conn.execute(
+        "SELECT type, name, tbl_name, sql FROM sqlite_master "
+        "WHERE tbl_name NOT IN ('invoice_lines', 'invoices', 'invoice_items') "
+        "ORDER BY type, name").fetchall()
+    rows = {table: Counter(conn.execute(f'SELECT * FROM "{table}"').fetchall())
+            for table in names}
+    return objects, rows
+
+
+def require_columns(conn, table, expected):
+    def affinity(declared):
+        declared = declared.upper()
+        if 'INT' in declared:
+            return 'INTEGER'
+        if any(word in declared for word in ('CHAR', 'CLOB', 'TEXT')):
+            return 'TEXT'
+        return declared
+    actual = {row[1]: (affinity(row[2]), bool(row[3]), row[5])
+              for row in conn.execute(f'PRAGMA table_xinfo("{table}")')}
+    if set(actual) != set(expected):
+        raise AssertionError(f'{table} columns: {actual!r} != {expected!r}')
+    for name, (kind, required_not_null, pk) in expected.items():
+        got_kind, got_not_null, got_pk = actual[name]
+        if (got_kind != kind or got_pk != pk
+                or (required_not_null and not got_not_null)):
+            raise AssertionError(f'{table}.{name}: {actual[name]!r} != {expected[name]!r}')
 
 
 class Acceptance(unittest.TestCase):
@@ -44,7 +75,11 @@ class Acceptance(unittest.TestCase):
                      '2024-02-29', 0, 'ZERO', 1, 0))
         conn.executemany('INSERT INTO invoice_lines VALUES (?,?,?,?,?,?,?,?)', rows)
         conn.execute("INSERT INTO audit_log VALUES (4, 'retain exactly')")
+        conn.execute('CREATE UNIQUE INDEX audit_note_unique ON audit_log(note)')
+        conn.execute("CREATE TRIGGER audit_no_delete BEFORE DELETE ON audit_log "
+                     "BEGIN SELECT RAISE(ABORT, 'audit protected'); END")
         conn.commit()
+        unrelated_before = unrelated_state(conn)
 
         migrate(conn)
         self.assertEqual(conn.execute('PRAGMA user_version').fetchone()[0], 2)
@@ -52,7 +87,21 @@ class Acceptance(unittest.TestCase):
         self.assertNotIn('invoice_lines', tables(conn))
         foreign_keys = {(row[3], row[2], row[4]) for row in conn.execute(
             'PRAGMA foreign_key_list(invoice_items)')}
-        self.assertIn(('invoice_id', 'invoices', 'invoice_id'), foreign_keys)
+        self.assertEqual(foreign_keys, {('invoice_id', 'invoices', 'invoice_id')})
+        require_columns(conn, 'invoices', {
+            'invoice_id': ('TEXT', True, 1),
+            'customer_email': ('TEXT', True, 0),
+            'issued_on': ('TEXT', True, 0),
+            'paid_cents': ('INTEGER', True, 0),
+        })
+        require_columns(conn, 'invoice_items', {
+            'line_id': ('INTEGER', False, 1),
+            'invoice_id': ('TEXT', True, 0),
+            'sku': ('TEXT', True, 0),
+            'quantity': ('INTEGER', True, 0),
+            'unit_cents': ('INTEGER', True, 0),
+        })
+        self.assertEqual(unrelated_state(conn), unrelated_before)
         self.assertEqual(conn.execute('SELECT * FROM audit_log').fetchall(),
                          [(4, 'retain exactly')])
         self.assertEqual(conn.execute('PRAGMA foreign_key_check').fetchall(), [])

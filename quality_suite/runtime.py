@@ -2,12 +2,54 @@
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import subprocess
 import tempfile
 import uuid
 
 DEFAULT_IMAGE = 'rigmark-quality-runtime:0.4'
+
+
+def terminal_events(log):
+    """Retain grading events from the entire log without retaining the log."""
+    log.seek(0)
+    events = {'go_pass': set(), 'python_pass': set(), 'python_failed': set(),
+              'unittest_ran': None, 'unittest_ok': False,
+              'source_error': False, 'build_failed': False,
+              'c_compile_error': False}
+    pending = b''
+
+    def visit(raw):
+        if len(raw) > 8192:
+            return
+        line = raw.decode('utf-8', errors='replace').strip()
+        if match := re.match(r'^--- PASS: (\S+) \(', line):
+            events['go_pass'].add(match.group(1))
+        if match := re.match(r'^\S+ \(([^)]+)\) \.\.\. ok$', line):
+            events['python_pass'].add(match.group(1))
+        if match := re.match(r'^(?:FAIL|ERROR): \S+ \(([^)]+)\)$', line):
+            events['python_failed'].add(match.group(1))
+        if match := re.match(r'^Ran (\d+) tests? in ', line):
+            events['unittest_ran'] = int(match.group(1))
+            events['unittest_ok'] = False
+        if line == 'OK' and events['unittest_ran'] is not None:
+            events['unittest_ok'] = True
+        events['source_error'] |= any(word in line for word in
+                                      ('SyntaxError', 'ImportError', 'ModuleNotFoundError'))
+        events['build_failed'] |= '[build failed]' in line.lower()
+        events['c_compile_error'] |= bool(re.search(r':\d+:\d+: error:|undefined reference',
+                                                    line.lower()))
+
+    while chunk := log.read(65536):
+        lines = (pending + chunk).split(b'\n')
+        pending = lines.pop()[-8192:]
+        for line in lines:
+            visit(line)
+    if pending:
+        visit(pending)
+    return {key: sorted(value) if isinstance(value, set) else value
+            for key, value in events.items()}
 
 
 def capture(command, timeout=60):
@@ -21,6 +63,7 @@ def capture(command, timeout=60):
             timed_out = True
             os.killpg(p.pid, signal.SIGKILL)
             p.wait()
+        evidence = terminal_events(log)
         size = log.seek(0, os.SEEK_END)
         if size <= 65536:
             log.seek(0)
@@ -31,7 +74,8 @@ def capture(command, timeout=60):
             log.seek(size - 32768)
             tail = log.read().decode('utf-8', errors='replace')
             output = head + '\n[intermediate output omitted]\n' + tail
-        return {'exit_code': p.returncode, 'timeout': timed_out, 'output': output}
+        return {'exit_code': p.returncode, 'timeout': timed_out,
+                'output': output, 'terminal_events': evidence}
 
 
 def image_id(image):

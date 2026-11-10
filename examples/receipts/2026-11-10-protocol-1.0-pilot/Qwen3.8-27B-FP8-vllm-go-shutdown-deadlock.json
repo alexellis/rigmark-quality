@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "15f464151c933f8d2c7067f9aa25cd8add1b05a689c687096cc25c163162140c",
+  "suite_sha256": "f2409820d9f11a35b5c1fd258c295218d0fa0420ecf2e1f19a6d5bc969093aac",
   "task_sha256": "184bbff65bb0bead31d482eeb957ee203903683ae2fb4251fe10617985a39eba",
   "request": {
     "temperature": 0,
@@ -31,30 +31,32 @@
     "Qwen3.8-27B-FP8-vllm",
     "Qwen3.8-27B-FP8-vllm",
     "Qwen3.8-27B-FP8-vllm",
+    "Qwen3.8-27B-FP8-vllm",
+    "Qwen3.8-27B-FP8-vllm",
     "Qwen3.8-27B-FP8-vllm"
   ],
   "model_match": true,
-  "started_at": "2026-11-10T19:25:25.162974+00:00",
-  "finished_at": "2026-11-10T19:27:28.923478+00:00",
-  "elapsed_seconds": 123.8,
+  "started_at": "2026-11-10T19:54:15.033988+00:00",
+  "finished_at": "2026-11-10T19:56:19.916412+00:00",
+  "elapsed_seconds": 124.9,
   "usage": {
-    "prompt_tokens": 35844,
-    "completion_tokens": 7285,
+    "prompt_tokens": 49212,
+    "completion_tokens": 7411,
     "reasoning_tokens": 0
   },
   "reasoning_diagnostics": {
-    "characters": 19825,
-    "repeated_trigram_fraction": 0.334,
+    "characters": 20129,
+    "repeated_trigram_fraction": 0.291,
     "loop_detected": false
   },
   "tool_diagnostics": {
-    "parsed_calls": 17,
-    "invalid_calls": 0,
+    "parsed_calls": 19,
+    "invalid_calls": 1,
     "no_call_or_answer": false,
     "unfinished_after_tool": false,
     "unparsed_tool_markup": false
   },
-  "steps": 12,
+  "steps": 14,
   "checks": {
     "acceptance": true,
     "public_tests": true,
@@ -69,5 +71,5 @@
   "failure": null,
   "review_output_format": null,
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with isolated public tests and hardened hidden acceptance, transaction, boundary, and regression checks. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with concurrent shutdown checks, full SQLite schema and result-column checks, complete-log terminal evidence, and equivalent race explanations. Conversation, tool calls, file diffs, and endpoint details omitted."
 }

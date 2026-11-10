@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "15f464151c933f8d2c7067f9aa25cd8add1b05a689c687096cc25c163162140c",
+  "suite_sha256": "f2409820d9f11a35b5c1fd258c295218d0fa0420ecf2e1f19a6d5bc969093aac",
   "task_sha256": "184bbff65bb0bead31d482eeb957ee203903683ae2fb4251fe10617985a39eba",
   "request": {
     "temperature": 0,
@@ -32,17 +32,17 @@
     "DeepSeek-V4.1-Flash-1017"
   ],
   "model_match": true,
-  "started_at": "2026-11-10T19:25:26.401634+00:00",
-  "finished_at": "2026-11-10T19:26:41.969441+00:00",
-  "elapsed_seconds": 75.6,
+  "started_at": "2026-11-10T19:51:58.567782+00:00",
+  "finished_at": "2026-11-10T19:53:12.744815+00:00",
+  "elapsed_seconds": 74.2,
   "usage": {
-    "prompt_tokens": 31539,
-    "completion_tokens": 2433,
-    "reasoning_tokens": 575
+    "prompt_tokens": 31838,
+    "completion_tokens": 2397,
+    "reasoning_tokens": 596
   },
   "reasoning_diagnostics": {
-    "characters": 2166,
-    "repeated_trigram_fraction": 0.031,
+    "characters": 2242,
+    "repeated_trigram_fraction": 0.03,
     "loop_detected": false
   },
   "tool_diagnostics": {
@@ -67,5 +67,5 @@
   "failure": null,
   "review_output_format": null,
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with isolated public tests and hardened hidden acceptance, transaction, boundary, and regression checks. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with concurrent shutdown checks, full SQLite schema and result-column checks, complete-log terminal evidence, and equivalent race explanations. Conversation, tool calls, file diffs, and endpoint details omitted."
 }

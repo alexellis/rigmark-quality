@@ -10,19 +10,19 @@
 ├─ TASKS ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │  TASK                        ARTEFACT  FINISHED  TIME     STOP             │
-│  sqlite-migration            yes       yes        104.9s normal            │
-│  sqlite-report               yes       yes         28.0s normal            │
-│  go-shutdown-deadlock        yes       yes         75.6s normal            │
-│  go-concurrency-review       yes       yes         14.1s normal            │
-│  go-export-boundary          yes       yes         81.0s normal            │
-│  c-frame-bounds              yes       yes         23.1s normal            │
+│  sqlite-migration            yes       yes         49.2s normal            │
+│  sqlite-report               yes       yes         34.5s normal            │
+│  go-shutdown-deadlock        yes       yes         74.2s normal            │
+│  go-concurrency-review       yes       yes         14.3s normal            │
+│  go-export-boundary          yes       yes         81.7s normal            │
+│  c-frame-bounds              yes       yes         23.6s normal            │
 │                                                                            │
 │  Artefact and conversation completion are separate outcomes.               │
 │  Read the JSON summary for checks and stop state.                          │
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
-│  Tasks 6  ·  Suite 1.0  ·  SHA256 15f464151c933f8d…                        │
+│  Tasks 6  ·  Suite 1.0  ·  SHA256 f2409820d9f11a35…                        │
 │  Reasoning low  ·  Thinking default  ·  Output cap 32768                   │
 │  Turn cap none  ·  Time cap 1800s                                          │
 │                                                                            │
@@ -39,19 +39,19 @@
 ├─ TASKS ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │  TASK                        ARTEFACT  FINISHED  TIME     STOP             │
-│  sqlite-migration            yes       yes         99.6s normal            │
-│  sqlite-report               yes       yes         32.1s normal            │
-│  go-shutdown-deadlock        yes       yes        123.8s normal            │
-│  go-concurrency-review       yes       yes         61.4s normal            │
-│  go-export-boundary          yes       yes         62.2s normal            │
-│  c-frame-bounds              yes       yes         14.4s normal            │
+│  sqlite-migration            yes       yes        108.8s normal            │
+│  sqlite-report               yes       yes         31.6s normal            │
+│  go-shutdown-deadlock        yes       yes        124.9s normal            │
+│  go-concurrency-review       yes       yes         61.5s normal            │
+│  go-export-boundary          yes       yes         61.9s normal            │
+│  c-frame-bounds              yes       yes         14.2s normal            │
 │                                                                            │
 │  Artefact and conversation completion are separate outcomes.               │
 │  Read the JSON summary for checks and stop state.                          │
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
-│  Tasks 6  ·  Suite 1.0  ·  SHA256 15f464151c933f8d…                        │
+│  Tasks 6  ·  Suite 1.0  ·  SHA256 f2409820d9f11a35…                        │
 │  Reasoning low  ·  Thinking default  ·  Output cap 32768                   │
 │  Turn cap none  ·  Time cap 1800s                                          │
 │                                                                            │
@@ -68,19 +68,19 @@
 ├─ TASKS ────────────────────────────────────────────────────────────────────┤
 │                                                                            │
 │  TASK                        ARTEFACT  FINISHED  TIME     STOP             │
-│  sqlite-migration            yes       yes         34.1s normal            │
-│  sqlite-report               yes       yes         13.3s normal            │
-│  go-shutdown-deadlock        yes       yes         52.1s normal            │
-│  go-concurrency-review       yes       yes          8.5s normal            │
-│  go-export-boundary          yes       yes         96.5s normal            │
-│  c-frame-bounds              yes       yes         11.6s normal            │
+│  sqlite-migration            yes       yes         35.6s normal            │
+│  sqlite-report               yes       yes         15.2s normal            │
+│  go-shutdown-deadlock        yes       yes         73.3s normal            │
+│  go-concurrency-review       yes       yes         12.7s normal            │
+│  go-export-boundary          yes       yes         80.0s normal            │
+│  c-frame-bounds              yes       yes         11.8s normal            │
 │                                                                            │
 │  Artefact and conversation completion are separate outcomes.               │
 │  Read the JSON summary for checks and stop state.                          │
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
-│  Tasks 6  ·  Suite 1.0  ·  SHA256 15f464151c933f8d…                        │
+│  Tasks 6  ·  Suite 1.0  ·  SHA256 f2409820d9f11a35…                        │
 │  Reasoning low  ·  Thinking default  ·  Output cap 32768                   │
 │  Turn cap none  ·  Time cap 1800s                                          │
 │                                                                            │

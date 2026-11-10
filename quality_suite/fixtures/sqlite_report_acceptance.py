@@ -36,7 +36,10 @@ class Acceptance(unittest.TestCase):
             self.assertEqual(conn.execute(f'SELECT * FROM {table} ORDER BY id').fetchall(), rows,
                              table + ' changed while adding indexes')
         query = Path('report.sql').read_text()
-        got = conn.execute(query, {'since': since}).fetchall()
+        cursor = conn.execute(query, {'since': since})
+        self.assertEqual([column[0] for column in cursor.description],
+                         ['customer_id', 'revenue_cents'])
+        got = cursor.fetchall()
         self.assertEqual(got, want)
         conn.execute('ANALYZE')
         conn.execute('PRAGMA automatic_index = OFF')

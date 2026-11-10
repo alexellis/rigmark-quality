@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "15f464151c933f8d2c7067f9aa25cd8add1b05a689c687096cc25c163162140c",
+  "suite_sha256": "f2409820d9f11a35b5c1fd258c295218d0fa0420ecf2e1f19a6d5bc969093aac",
   "task_sha256": "c41678fb81384bd3baeb994f822104e1b502c7dcd66b83f440dff2c9fcab4658",
   "request": {
     "temperature": 0,
@@ -28,12 +28,12 @@
     "Qwen3.8-27B-FP8-vllm"
   ],
   "model_match": true,
-  "started_at": "2026-11-10T19:29:32.527729+00:00",
-  "finished_at": "2026-11-10T19:29:46.906486+00:00",
-  "elapsed_seconds": 14.4,
+  "started_at": "2026-11-10T19:58:23.357481+00:00",
+  "finished_at": "2026-11-10T19:58:37.512970+00:00",
+  "elapsed_seconds": 14.2,
   "usage": {
-    "prompt_tokens": 9216,
-    "completion_tokens": 1392,
+    "prompt_tokens": 9266,
+    "completion_tokens": 1381,
     "reasoning_tokens": 0
   },
   "reasoning_diagnostics": {
@@ -62,5 +62,5 @@
   "failure": null,
   "review_output_format": null,
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with isolated public tests and hardened hidden acceptance, transaction, boundary, and regression checks. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with concurrent shutdown checks, full SQLite schema and result-column checks, complete-log terminal evidence, and equivalent race explanations. Conversation, tool calls, file diffs, and endpoint details omitted."
 }

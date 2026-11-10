@@ -18,7 +18,7 @@ MIGRATION_STARTER = '''"""Migrate legacy invoice lines into invoices and invoice
 
 def migrate(conn):
     rows = conn.execute("SELECT * FROM invoice_lines").fetchall()
-    conn.execute("CREATE TABLE invoices (invoice_id TEXT PRIMARY KEY, customer_email TEXT NOT NULL, issued_on TEXT NOT NULL, paid_cents INTEGER NOT NULL)")
+    conn.execute("CREATE TABLE invoices (invoice_id TEXT PRIMARY KEY NOT NULL, customer_email TEXT NOT NULL, issued_on TEXT NOT NULL, paid_cents INTEGER NOT NULL)")
     conn.execute("CREATE TABLE invoice_items (line_id INTEGER PRIMARY KEY, invoice_id TEXT NOT NULL REFERENCES invoices(invoice_id), sku TEXT NOT NULL, quantity INTEGER NOT NULL, unit_cents INTEGER NOT NULL)")
     seen = set()
     for line_id, invoice_id, email, issued_on, paid_cents, sku, quantity, unit_cents in rows:
@@ -53,7 +53,7 @@ def migrate(conn):
             if invoice_id in invoices and invoices[invoice_id] != metadata:
                 raise ValueError("conflicting metadata for invoice " + invoice_id)
             invoices[invoice_id] = metadata
-        conn.execute("CREATE TABLE invoices (invoice_id TEXT PRIMARY KEY, "
+        conn.execute("CREATE TABLE invoices (invoice_id TEXT PRIMARY KEY NOT NULL, "
                      "customer_email TEXT NOT NULL, issued_on TEXT NOT NULL, "
                      "paid_cents INTEGER NOT NULL)")
         conn.execute("CREATE TABLE invoice_items (line_id INTEGER PRIMARY KEY, "
@@ -188,7 +188,9 @@ TASK_DEFINITIONS = {
                    'after a successful migration. Reject conflicting invoice '
                    'metadata without any schema or data change. A second call '
                    'must be harmless. Do not commit the caller\'s transaction. '
-                   'Leave unrelated tables alone. Add regression tests in '
+                   'Retain the target primary keys, NOT NULL business fields, '
+                   'and invoice_items foreign key; invoice_id must reject NULL. '
+                   'Leave unrelated tables and their schema alone. Add regression tests in '
                    'test_migration.py and run them. Only edit those two files.'),
         'files': {'schema.py': 'LEGACY_SCHEMA = """\n' + LEGACY_SCHEMA + '"""\n',
                   'migration.py': MIGRATION_STARTER,

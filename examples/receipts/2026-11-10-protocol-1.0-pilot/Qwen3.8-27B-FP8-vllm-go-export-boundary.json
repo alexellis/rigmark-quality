@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "15f464151c933f8d2c7067f9aa25cd8add1b05a689c687096cc25c163162140c",
+  "suite_sha256": "f2409820d9f11a35b5c1fd258c295218d0fa0420ecf2e1f19a6d5bc969093aac",
   "task_sha256": "478587d442637200564452e213c1be6a9a4fc5f23f75dc1dece4bb55c16d098b",
   "request": {
     "temperature": 0,
@@ -28,11 +28,11 @@
     "Qwen3.8-27B-FP8-vllm"
   ],
   "model_match": true,
-  "started_at": "2026-11-10T19:28:30.344419+00:00",
-  "finished_at": "2026-11-10T19:29:32.526479+00:00",
-  "elapsed_seconds": 62.2,
+  "started_at": "2026-11-10T19:57:21.467263+00:00",
+  "finished_at": "2026-11-10T19:58:23.356283+00:00",
+  "elapsed_seconds": 61.9,
   "usage": {
-    "prompt_tokens": 11742,
+    "prompt_tokens": 11843,
     "completion_tokens": 1194,
     "reasoning_tokens": 0
   },
@@ -63,5 +63,5 @@
   "failure": null,
   "review_output_format": null,
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with isolated public tests and hardened hidden acceptance, transaction, boundary, and regression checks. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with concurrent shutdown checks, full SQLite schema and result-column checks, complete-log terminal evidence, and equivalent race explanations. Conversation, tool calls, file diffs, and endpoint details omitted."
 }

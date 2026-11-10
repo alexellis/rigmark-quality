@@ -16,18 +16,22 @@ conversation on all six tasks in this pilot.
 | C frame bounds | Pass | Pass | Pass |
 
 All receipts use suite SHA-256
-`15f464151c933f8d2c7067f9aa25cd8add1b05a689c687096cc25c163162140c`,
+`f2409820d9f11a35b5c1fd258c295218d0fa0420ecf2e1f19a6d5bc969093aac`,
 temperature 0, top-p 1, seed 20261011, requested low reasoning, provider
 default thinking, a 32,768-token response cap, no turn cap, and a 1,800-second
 task deadline. All six tasks were rerun for each model on 10 November after
 the hidden acceptance and regression checks were strengthened. The controls
 reject premature exits from the Go and C acceptance tests, a migration that
-rolls back the caller's transaction or mutates unrelated data on rerun, an
-exclusive date boundary, replaced baseline tests, and comment-only SQLite
-regression tests. The report judge accepts a valid partial index, and the
-review judge accepts equivalent descriptions of a channel-close race. Public
-tests run on disposable copies, and withheld fixtures are compiled before
-their source is removed from the execution copy.
+weakens target constraints or changes unrelated schema, one that rolls back
+the caller's transaction or mutates unrelated data on rerun, a report with
+incorrect output aliases or an exclusive date boundary, replaced baseline
+tests, and comment-only SQLite regression tests. The shutdown judge exercises
+concurrent submissions and closers, then checks that every accepted job was
+processed. The report judge accepts a valid partial index, and the review
+judge accepts equivalent descriptions of a channel-close race. Public tests
+run on disposable copies. Withheld fixtures are compiled before their source
+is removed from the execution copy, and terminal evidence is parsed from the
+complete logs before presentation output is shortened.
 
 GLM 5.3 Flash NVFP4 ran through Toilgate on four DGX Sparks. DeepSeek V4.1
 Flash 1017 used Mia's 2.9 bpw EXL3 TensorFold recipe directly on two DGX

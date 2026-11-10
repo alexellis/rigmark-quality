@@ -99,8 +99,7 @@ def make_workspace(task_id, root, arkade_root):
 def hidden_go_test_passed(result, task_id):
     expected = {'go-shutdown-deadlock': 'TestRigmarkAcceptanceShutdown',
                 'go-export-boundary': 'TestRigmarkAcceptanceTenantBoundary'}[task_id]
-    return bool(re.search(r'(?m)^--- PASS: ' + re.escape(expected) + r' \(',
-                          result['output']))
+    return expected in result['terminal_events']['go_pass']
 
 
 def hidden_python_suite_passed(result, task_id):
@@ -111,14 +110,12 @@ def hidden_python_suite_passed(result, task_id):
         'sqlite-report': ('test_different_seed_and_date',
                           'test_large_repetitive_seed'),
     }[task_id]
-    output = result['output']
     module = task_id.replace('-', '_') + '_acceptance'
-    return (all(re.search(r'(?m)^' + re.escape(name) + r' \('
-                          + re.escape(module) + r'\.Acceptance\.'
-                          + re.escape(name) + r'\) \.\.\. ok$', output)
+    events = result['terminal_events']
+    return (all(f'{module}.Acceptance.{name}' in events['python_pass']
                 for name in expected)
-            and bool(re.search(r'(?m)^Ran ' + str(len(expected))
-                               + r' tests? in [^\n]+\n\nOK$', output)))
+            and events['unittest_ran'] == len(expected)
+            and events['unittest_ok'])
 
 
 def python_test_methods(source, module):
@@ -274,14 +271,12 @@ def grade_coding(task_id, workspace, image, arkade_root):
             for name in restore:
                 (original / name).write_text(tasks.TASKS[task_id]['files'][name])
             regression = runtime.run(original, image, runtime.public_command(task_id), 90)
-        failed_new_test = any(re.search(
-            r'(?m)^(?:FAIL|ERROR): \S+ \(' + re.escape(name) + r'\)$',
-            regression['output']) for name in added_methods)
+        failed_new_test = bool(set(added_methods)
+                               & set(regression['terminal_events']['python_failed']))
         checks['regression_fails_on_original'] = (
             regression['exit_code'] != 0 and not regression['timeout']
             and failed_new_test
-            and not any(marker in regression['output'] for marker in
-                        ('SyntaxError', 'ImportError', 'ModuleNotFoundError')))
+            and not regression['terminal_events']['source_error'])
         result['regression_control'] = regression
     elif task_id in ('go-shutdown-deadlock', 'go-export-boundary', 'c-frame-bounds'):
         original_tests = tasks.TASKS[task_id]['files'][test_name]
@@ -331,13 +326,12 @@ def grade_coding(task_id, workspace, image, arkade_root):
                 command = (f'go test -race -count=1 -timeout=30s '
                            f'-run "^({names})$" .')
             regression = runtime.run(original, image, command, 35)
-        output = regression['output'].lower()
+        events = regression['terminal_events']
         checks['regression_fails_on_original'] = (
             (regression['exit_code'] != 0 or regression['timeout'])
-            and '[build failed]' not in output
+            and not events['build_failed']
             and not (task_id == 'c-frame-bounds'
-                     and (re.search(r'(?m)^.*:\d+:\d+: error:', output)
-                          or 'undefined reference' in output)))
+                     and events['c_compile_error']))
         result['regression_control'] = regression
     if task_id in ('go-worker-pool', 'go-transfer-ledger',
                    'go-shutdown-deadlock', 'go-export-boundary'):
@@ -676,6 +670,17 @@ def selftest(root, arkade_root, image):
                 outcomes['sqlite-migration-rollback-conflict'] = {
                     'reference': {'acceptance': good_checks['acceptance']},
                     'broken': {'acceptance': conflict_checks['acceptance']}}
+                weak_schema = parent / 'weak-schema'
+                shutil.copytree(good, weak_schema)
+                source = weak_schema / 'migration.py'
+                source.write_text(source.read_text().replace(
+                    'invoice_id TEXT PRIMARY KEY NOT NULL, ',
+                    'invoice_id TEXT, ', 1))
+                weak_schema_checks, _ = grade_coding(
+                    task_id, weak_schema, image, arkade_root)
+                outcomes['sqlite-migration-weak-schema'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': weak_schema_checks['acceptance']}}
                 rerun = parent / 'destructive-rerun'
                 shutil.copytree(good, rerun)
                 source = rerun / 'migration.py'
@@ -749,6 +754,16 @@ def selftest(root, arkade_root, image):
                 outcomes['sqlite-report-exclusive-date'] = {
                     'reference': {'acceptance': good_checks['acceptance']},
                     'broken': {'acceptance': exclusive_checks['acceptance']}}
+                wrong_alias = parent / 'wrong-report-alias'
+                shutil.copytree(good, wrong_alias)
+                query = wrong_alias / 'report.sql'
+                query.write_text(query.read_text().replace(
+                    'AS revenue_cents', 'AS total_cents'))
+                alias_checks, _ = grade_coding(
+                    task_id, wrong_alias, image, arkade_root)
+                outcomes['sqlite-report-wrong-alias'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': alias_checks['acceptance']}}
     with tempfile.TemporaryDirectory(prefix='rigmark-review-control-') as directory:
         review_workspace = make_workspace('go-concurrency-review', Path(directory), arkade_root)
         review_box = tools.ToolBox('go-concurrency-review', review_workspace, image)

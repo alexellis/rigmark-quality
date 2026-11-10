@@ -10,33 +10,54 @@ GO_DEADLOCK_ACCEPTANCE = r'''package shutdown
 
 import (
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
 
 func TestRigmarkAcceptanceShutdown(t *testing.T) {
-	s := NewService()
-	const count = 20
-	for i := 0; i < count; i++ {
-		if !s.Submit(i) { t.Fatal("accepted work was rejected") }
+	for round := 0; round < 8; round++ {
+		s := NewService()
+		const initial, contenders = 20, 32
+		for i := 0; i < initial; i++ {
+			if !s.Submit(i) { t.Fatal("accepted work was rejected") }
+		}
+		start := make(chan struct{})
+		ready := make(chan struct{}, contenders)
+		var accepted atomic.Int64
+		var submitters sync.WaitGroup
+		for i := 0; i < contenders; i++ {
+			submitters.Add(1)
+			go func(job int) {
+				defer submitters.Done()
+				ready <- struct{}{}
+				<-start
+				if s.Submit(job) { accepted.Add(1) }
+			}(initial + i)
+		}
+		for i := 0; i < contenders; i++ { <-ready }
+		var closers sync.WaitGroup
+		for i := 0; i < 8; i++ {
+			closers.Add(1)
+			go func() { defer closers.Done(); <-start; s.Close() }()
+		}
+		close(start)
+		finished := make(chan struct{})
+		go func() { submitters.Wait(); closers.Wait(); close(finished) }()
+		select {
+		case <-finished:
+		case <-time.After(1500 * time.Millisecond): t.Fatal("Submit or Close deadlocked")
+		}
+		select {
+		case <-s.Stopped():
+		default: t.Fatal("worker did not signal stop")
+		}
+		want := initial + int(accepted.Load())
+		if got := s.Processed(); got != want {
+			t.Fatalf("round %d lost accepted jobs: %d/%d", round, got, want)
+		}
+		if s.Submit(1000) { t.Fatal("accepted work after Close") }
 	}
-	var closers sync.WaitGroup
-	for i := 0; i < 8; i++ {
-		closers.Add(1)
-		go func() { defer closers.Done(); s.Close() }()
-	}
-	finished := make(chan struct{})
-	go func() { closers.Wait(); close(finished) }()
-	select {
-	case <-finished:
-	case <-time.After(1500 * time.Millisecond): t.Fatal("Close deadlocked")
-	}
-	select {
-	case <-s.Stopped():
-	default: t.Fatal("worker did not signal stop")
-	}
-	if got := s.Processed(); got != count { t.Fatalf("lost accepted jobs: %d/%d", got, count) }
-	if s.Submit(100) { t.Fatal("accepted work after Close") }
 }
 '''
 
@@ -153,9 +174,10 @@ def review_format(answer):
 
 def review_kind(kind):
     words = set(re.findall(r'[a-z]+', kind.casefold()))
-    return (bool(words & {'channel', 'jobs', 'queue'}) and
-            bool(words & {'close', 'closed', 'closing', 'shut'}) and
-            bool(words & {'send', 'enqueue', 'race', 'panic', 'crash'}))
+    return (('race' in words and bool(words & {'toctou', 'shutdown'})) or
+            (bool(words & {'channel', 'jobs', 'queue'}) and
+             bool(words & {'close', 'closed', 'closing', 'shut'}) and
+             bool(words & {'send', 'enqueue', 'race', 'panic', 'crash'})))
 
 
 def review_cause(kind, evidence):
@@ -166,21 +188,26 @@ def review_cause(kind, evidence):
                   r'(?:\w+\s+){0,2}panic\b', text)
             or re.search(r'\b(?:is|remains)\s+safe\b', text)):
         return False
-    cause = text
+    release = r'\b(?:unlocks?|releases?|drops?)\b(?:\s+(?:the\s+)?(?:mutex|lock))?'
+    close = (r'\bclose\b.{0,80}?\b(?:closes?|shuts?(?:\s+down)?|terminates?)\s*'
+             r'(?:the\s+)?(?:\(?\s*(?:d\.)?jobs|channel|queue)\b')
+    send = r'(?:\b(?:d\.)?jobs\s*<-\s*job\b|\bsends?\b|\benqueues?\b)'
+    crash = r'\b(?:panic(?:s|king|ked)?|crash(?:es|ed)?)\b'
     position = 0
-    for pattern in (
-            r'\bsubmit\b',
-            r'\b(?:unlocks?|releases?|drops?)\b(?:\s+(?:the\s+)?(?:mutex|lock))?',
-            r'\bclose\b',
-            r'\b(?:closes?|shuts?(?:\s+down)?|terminates?)\s*'
-            r'(?:the\s+)?(?:\(?\s*(?:d\.)?jobs|channel|queue)\b',
-            r'(?:\b(?:d\.)?jobs\s*<-\s*job\b|\bsends?\b|\benqueues?\b)',
-            r'\b(?:panic(?:s|king|ked)?|crash(?:es|ed)?)\b'):
-        match = re.search(pattern, cause[position:])
+    for pattern in (r'\bsubmit\b', release, close, send, crash):
+        match = re.search(pattern, text[position:], re.S)
         if not match:
-            return False
+            break
         position += match.end()
-    return True
+    else:
+        return True
+    # A valid explanation can lead with Close and describe its position
+    # relative to Submit's unlock in an "after" clause.
+    reverse = re.search(close + r'.{0,100}?\bafter\b.{0,100}?\bsubmit\b'
+                        + r'.{0,100}?' + release, text, re.S)
+    later_send = re.search(r'\bsubmit\b.{0,80}?\b(?:then|later|afterwards)\b'
+                           r'.{0,80}?' + send + r'.{0,80}?' + crash, text, re.S)
+    return bool(reverse and later_send)
 
 
 def grade_review(answer, calls):

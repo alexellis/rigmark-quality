@@ -1,3 +1,4 @@
+import io
 import json
 import tempfile
 import unittest
@@ -48,9 +49,11 @@ class BaselineTestTests(unittest.TestCase):
                   '(sqlite_report_acceptance.Acceptance.test_different_seed_and_date) '
                   '... ok\n\n----------------------------------------------------------------------\n'
                   'Ran 2 tests in 0.2s\n\nOK\n')
-        self.assertTrue(cli.hidden_python_suite_passed({'output': output},
+        self.assertTrue(cli.hidden_python_suite_passed(
+            {'terminal_events': runtime.terminal_events(io.BytesIO(output.encode()))},
                                                        'sqlite-report'))
-        self.assertFalse(cli.hidden_python_suite_passed({'output': ''},
+        self.assertFalse(cli.hidden_python_suite_passed(
+            {'terminal_events': runtime.terminal_events(io.BytesIO(b''))},
                                                         'sqlite-report'))
 
 
@@ -77,6 +80,16 @@ class PublicTestIsolationTests(unittest.TestCase):
         self.assertIn('start', result['output'])
         self.assertIn('terminal verdict', result['output'])
         self.assertIn('[intermediate output omitted]', result['output'])
+
+    def test_grading_event_survives_truncated_middle(self):
+        result = runtime.capture(['python3', '-c',
+                                  'print("x" * 40000); '
+                                  'print("test_case (suite.Acceptance.test_case) ... ok"); '
+                                  'print("x" * 40000); '
+                                  'print("Ran 1 test in 0.1s\\n\\nOK")'])
+        self.assertNotIn('suite.Acceptance.test_case', result['output'])
+        self.assertIn('suite.Acceptance.test_case',
+                      result['terminal_events']['python_pass'])
 
 
 class ReviewGradeTests(unittest.TestCase):
@@ -169,6 +182,21 @@ class ReviewGradeTests(unittest.TestCase):
                     'the jobs channel is closed.')
         self.assertTrue(advanced_evaluators.review_cause(
             'send_on_closed_jobs', evidence))
+
+    def test_causal_review_accepts_close_first_clause(self):
+        evidence = ('Close closes jobs after Submit observes the dispatcher open '
+                    'and unlocks; Submit then sends to the closed channel and panics.')
+        self.assertTrue(advanced_evaluators.review_cause(
+            'TOCTOU shutdown race', evidence))
+
+    def test_causal_review_uses_send_after_close(self):
+        evidence = ('Submit releases the mutex after reading wasClosed and '
+                    'performs a send outside the lock. Interleaving: Submit '
+                    'reads closed=false and unlocks; Close sets closed=true '
+                    'and close(d.jobs); Submit then sends to the closed '
+                    'channel, panicking.')
+        self.assertTrue(advanced_evaluators.review_cause(
+            'send-on-closed-channel panic', evidence))
 
     def test_false_positive_fails(self):
         with tempfile.TemporaryDirectory() as directory:
