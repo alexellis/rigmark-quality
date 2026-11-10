@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "0246ea126e8d043fc27915800439e95e384ad8e9b0b287b3f9bc9722f24547f7",
+  "suite_sha256": "a9ad27bfac58051df2f8fcfe0d46fa8915afe8e030f406822f4b60438e9b1bd0",
   "task_sha256": "3f60d44163c9520566ca0dd02167ceeacb4796650940f61181e2804d9708101f",
   "request": {
     "temperature": 0,
@@ -30,12 +30,12 @@
     "Qwen3.8-27B-FP8-vllm"
   ],
   "model_match": true,
-  "started_at": "2026-11-10T16:07:43.627649+00:00",
-  "finished_at": "2026-11-10T16:08:18.187194+00:00",
-  "elapsed_seconds": 34.6,
+  "started_at": "2026-11-10T16:37:34.667626+00:00",
+  "finished_at": "2026-11-10T16:38:06.488138+00:00",
+  "elapsed_seconds": 31.8,
   "usage": {
     "prompt_tokens": 25368,
-    "completion_tokens": 3316,
+    "completion_tokens": 3323,
     "reasoning_tokens": 0
   },
   "reasoning_diagnostics": {
@@ -54,7 +54,8 @@
   "checks": {
     "acceptance": true,
     "public_tests": true,
-    "regression_test_added": true
+    "regression_test_added": true,
+    "regression_fails_on_original": true
   },
   "artefact_passed": true,
   "conversation_finished": true,
@@ -62,5 +63,5 @@
   "failure": null,
   "review_output_format": null,
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with strengthened acceptance checks. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with strengthened hidden acceptance and regression checks. Conversation, tool calls, file diffs, and endpoint details omitted."
 }

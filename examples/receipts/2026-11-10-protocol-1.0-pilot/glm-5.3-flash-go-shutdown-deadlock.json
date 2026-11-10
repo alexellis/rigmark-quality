@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "0246ea126e8d043fc27915800439e95e384ad8e9b0b287b3f9bc9722f24547f7",
+  "suite_sha256": "a9ad27bfac58051df2f8fcfe0d46fa8915afe8e030f406822f4b60438e9b1bd0",
   "task_sha256": "184bbff65bb0bead31d482eeb957ee203903683ae2fb4251fe10617985a39eba",
   "request": {
     "temperature": 0,
@@ -25,30 +25,34 @@
     "nvidia/GLM-5.3-Flash-NVFP4",
     "nvidia/GLM-5.3-Flash-NVFP4",
     "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
+    "nvidia/GLM-5.3-Flash-NVFP4",
     "nvidia/GLM-5.3-Flash-NVFP4"
   ],
   "model_match": true,
-  "started_at": "2026-11-10T16:06:45.803420+00:00",
-  "finished_at": "2026-11-10T16:07:32.824742+00:00",
-  "elapsed_seconds": 47.0,
+  "started_at": "2026-11-10T16:36:28.401716+00:00",
+  "finished_at": "2026-11-10T16:37:19.375748+00:00",
+  "elapsed_seconds": 51.0,
   "usage": {
-    "prompt_tokens": 10351,
-    "completion_tokens": 1225,
-    "reasoning_tokens": 197
+    "prompt_tokens": 19848,
+    "completion_tokens": 1148,
+    "reasoning_tokens": 189
   },
   "reasoning_diagnostics": {
-    "characters": 818,
-    "repeated_trigram_fraction": 0.022,
+    "characters": 798,
+    "repeated_trigram_fraction": 0.015,
     "loop_detected": false
   },
   "tool_diagnostics": {
-    "parsed_calls": 8,
+    "parsed_calls": 11,
     "invalid_calls": 0,
     "no_call_or_answer": false,
     "unfinished_after_tool": false,
     "unparsed_tool_markup": false
   },
-  "steps": 6,
+  "steps": 10,
   "checks": {
     "acceptance": true,
     "public_tests": true,
@@ -62,5 +66,5 @@
   "failure": null,
   "review_output_format": null,
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with strengthened acceptance checks. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with strengthened hidden acceptance and regression checks. Conversation, tool calls, file diffs, and endpoint details omitted."
 }

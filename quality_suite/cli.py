@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 from datetime import datetime, timezone
 import difflib
 import hashlib
@@ -95,6 +96,30 @@ def make_workspace(task_id, root, arkade_root):
     return destination
 
 
+def hidden_go_test_passed(result, task_id):
+    expected = {'go-shutdown-deadlock': 'TestRigmarkAcceptanceShutdown',
+                'go-export-boundary': 'TestRigmarkAcceptanceTenantBoundary'}[task_id]
+    for line in result['output'].splitlines():
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if event.get('Action') == 'pass' and event.get('Test') == expected:
+            return True
+    return False
+
+
+def python_test_methods(source, module):
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return set()
+    return {f'{module}.{node.name}.{method.name}'
+            for node in tree.body if isinstance(node, ast.ClassDef)
+            for method in node.body if isinstance(method, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and method.name.startswith('test_')}
+
+
 def grade_coding(task_id, workspace, image, arkade_root):
     if task_id == 'statement-redact':
         return grade_statement(workspace, image)
@@ -107,6 +132,9 @@ def grade_coding(task_id, workspace, image, arkade_root):
     with tempfile.TemporaryDirectory(prefix='rigmark-accept-') as directory:
         candidate = Path(directory) / 'candidate'
         shutil.copytree(workspace, candidate, ignore=shutil.ignore_patterns('.git'))
+        if task_id in ('go-shutdown-deadlock', 'go-export-boundary'):
+            for test_file in candidate.rglob('*_test.go'):
+                test_file.unlink()
         for name, content in evaluators.files(task_id, arkade_root).items():
             target = candidate / name
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -114,7 +142,9 @@ def grade_coding(task_id, workspace, image, arkade_root):
         result = runtime.run(candidate, image, runtime.acceptance_command(task_id),
                              90 if task_id in ('go-worker-pool', 'go-shutdown-deadlock',
                                                 'go-export-boundary') else 45)
-    checks = {'acceptance': result['exit_code'] == 0 and not result['timeout'],
+    hidden_ran = (hidden_go_test_passed(result, task_id)
+                  if task_id in ('go-shutdown-deadlock', 'go-export-boundary') else True)
+    checks = {'acceptance': result['exit_code'] == 0 and not result['timeout'] and hidden_ran,
               'public_tests': public['exit_code'] == 0 and not public['timeout']}
     result['public_tests'] = public
     test_name = {'python-expiry': 'test_expiry.py',
@@ -126,7 +156,33 @@ def grade_coding(task_id, workspace, image, arkade_root):
                  'go-shutdown-deadlock': 'service_test.go',
                  'go-export-boundary': 'server_test.go',
                  'c-frame-bounds': 'frame_test.c'}[task_id]
-    checks['regression_test_added'] = len((workspace / test_name).read_text()) > len(tasks.TASKS[task_id]['files'][test_name]) + 20
+    if task_id in ('sqlite-migration', 'sqlite-report'):
+        module = test_name.removesuffix('.py')
+        baseline_methods = python_test_methods(tasks.TASKS[task_id]['files'][test_name], module)
+        candidate_methods = python_test_methods((workspace / test_name).read_text(), module)
+        added_methods = candidate_methods - baseline_methods
+        checks['regression_test_added'] = len(candidate_methods) > len(baseline_methods)
+        with tempfile.TemporaryDirectory(prefix='rigmark-sqlite-regression-') as directory:
+            original = Path(directory) / 'candidate'
+            shutil.copytree(workspace, original)
+            restore = (('migration.py',) if task_id == 'sqlite-migration'
+                       else ('report.sql', 'indexes.sql'))
+            for name in restore:
+                (original / name).write_text(tasks.TASKS[task_id]['files'][name])
+            regression = runtime.run(original, image, runtime.public_command(task_id), 90)
+        failed_new_test = any(re.search(
+            r'(?m)^(?:FAIL|ERROR): \S+ \(' + re.escape(name) + r'\)$',
+            regression['output']) for name in added_methods)
+        checks['regression_fails_on_original'] = (
+            regression['exit_code'] != 0 and not regression['timeout']
+            and failed_new_test
+            and not any(marker in regression['output'] for marker in
+                        ('SyntaxError', 'ImportError', 'ModuleNotFoundError')))
+        result['regression_control'] = regression
+    else:
+        checks['regression_test_added'] = (
+            len((workspace / test_name).read_text())
+            > len(tasks.TASKS[task_id]['files'][test_name]) + 20)
     if task_id in ('go-shutdown-deadlock', 'go-export-boundary', 'c-frame-bounds'):
         source_name = {'go-shutdown-deadlock': 'service.go',
                        'go-export-boundary': 'server.go',
@@ -391,6 +447,33 @@ def selftest(root, arkade_root, image):
             outcomes[task_id] = {'broken': broken_checks, 'broken_exit': broken_result['exit_code'],
                                  'reference': good_checks, 'reference_exit': good_result['exit_code'],
                                  'reference_output': good_result['output'][-2000:] if not all(good_checks.values()) else ''}
+            if task_id in ('go-shutdown-deadlock', 'go-export-boundary'):
+                with (broken / {'go-shutdown-deadlock': 'service_test.go',
+                                'go-export-boundary': 'server_test.go'}[task_id]).open('a') as tests:
+                    tests.write('\nfunc TestMain(m *testing.M) {}\n')
+                bypass_checks, _ = grade_coding(task_id, broken, image, arkade_root)
+                outcomes[task_id + '-testmain'] = {
+                    'reference': {'hidden_acceptance': good_checks['acceptance'],
+                                  'public_bypass': bypass_checks['public_tests']},
+                    'broken': {'hidden_acceptance': bypass_checks['acceptance']}}
+            if task_id in ('sqlite-migration', 'sqlite-report'):
+                test_file = broken / ('test_migration.py' if task_id == 'sqlite-migration'
+                                      else 'test_report.py')
+                with test_file.open('a') as tests:
+                    tests.write('\n# This is a comment, not a regression test.\n')
+                comment_checks, _ = grade_coding(task_id, broken, image, arkade_root)
+                outcomes[task_id + '-comment'] = {
+                    'reference': {'new_test': good_checks['regression_test_added'],
+                                  'fails_old': good_checks['regression_fails_on_original']},
+                    'broken': {'comment_only': comment_checks['regression_test_added']}}
+            if task_id == 'c-frame-bounds':
+                source = good / 'frame.c'
+                source.write_text(source.read_text().replace('payload_len >= out_cap',
+                                                             'payload_len > out_cap'))
+                boundary_checks, _ = grade_coding(task_id, good, image, arkade_root)
+                outcomes['c-frame-exact-cap'] = {
+                    'reference': {'acceptance': good_checks['acceptance']},
+                    'broken': {'acceptance': boundary_checks['acceptance']}}
             if task_id == 'sqlite-report':
                 (good / 'indexes.sql').write_text(
                     'CREATE INDEX orders_date_status ON orders(ordered_on, status);\n'
@@ -657,7 +740,10 @@ def ascii_card(key, receipts):
             f"{mark(finished):9} {receipt.get('elapsed_seconds', 0):>6.1f}s {stop}")
     row()
     row('Artefact and conversation completion are separate outcomes.')
-    row('Read the JSON receipt for checks, tool calls, and stop reasons.')
+    if all(r.get('receipt_kind') == 'public_summary' for r in receipts):
+        row('Read the JSON summary for checks and stop state.')
+    else:
+        row('Read the JSON receipt for checks, tool calls, and stop reasons.')
     row()
     section('RUN')
     row(f"Tasks {len(receipts)}  ·  Suite {receipts[0].get('suite_version', '?')}  ·  SHA256 {suite_hash[:16]}…")

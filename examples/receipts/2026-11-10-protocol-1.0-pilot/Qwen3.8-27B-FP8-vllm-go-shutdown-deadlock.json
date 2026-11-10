@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "0246ea126e8d043fc27915800439e95e384ad8e9b0b287b3f9bc9722f24547f7",
+  "suite_sha256": "a9ad27bfac58051df2f8fcfe0d46fa8915afe8e030f406822f4b60438e9b1bd0",
   "task_sha256": "184bbff65bb0bead31d482eeb957ee203903683ae2fb4251fe10617985a39eba",
   "request": {
     "temperature": 0,
@@ -35,21 +35,21 @@
     "Qwen3.8-27B-FP8-vllm"
   ],
   "model_match": true,
-  "started_at": "2026-11-10T16:08:18.188697+00:00",
-  "finished_at": "2026-11-10T16:10:15.943893+00:00",
-  "elapsed_seconds": 117.8,
+  "started_at": "2026-11-10T16:38:06.489742+00:00",
+  "finished_at": "2026-11-10T16:40:09.244973+00:00",
+  "elapsed_seconds": 122.8,
   "usage": {
-    "prompt_tokens": 38398,
-    "completion_tokens": 7405,
+    "prompt_tokens": 39866,
+    "completion_tokens": 7299,
     "reasoning_tokens": 0
   },
   "reasoning_diagnostics": {
-    "characters": 20935,
-    "repeated_trigram_fraction": 0.334,
+    "characters": 19316,
+    "repeated_trigram_fraction": 0.279,
     "loop_detected": false
   },
   "tool_diagnostics": {
-    "parsed_calls": 17,
+    "parsed_calls": 18,
     "invalid_calls": 0,
     "no_call_or_answer": false,
     "unfinished_after_tool": false,
@@ -69,5 +69,5 @@
   "failure": null,
   "review_output_format": null,
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with strengthened acceptance checks. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with strengthened hidden acceptance and regression checks. Conversation, tool calls, file diffs, and endpoint details omitted."
 }

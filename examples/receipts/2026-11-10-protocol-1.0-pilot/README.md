@@ -16,13 +16,14 @@ conversation on all six tasks in this pilot.
 | C frame bounds | Pass | Pass | Pass |
 
 All receipts use suite SHA-256
-`0246ea126e8d043fc27915800439e95e384ad8e9b0b287b3f9bc9722f24547f7`,
+`a9ad27bfac58051df2f8fcfe0d46fa8915afe8e030f406822f4b60438e9b1bd0`,
 temperature 0, top-p 1, seed 20261011, requested low reasoning, provider
 default thinking, a 32,768-token response cap, no turn cap, and a 1,800-second
 task deadline. All six tasks were rerun for each model on 10 November after
-the SQLite query-plan and Go review checks were strengthened. The new controls
-reject an incorrectly ordered index, failed or partial file reads, and a
-review that calls the unsafe dispatcher sound.
+the hidden acceptance and regression checks were strengthened. The controls
+reject an incorrectly ordered index, failed or partial file reads, a review
+that calls the unsafe dispatcher sound, candidate `TestMain` bypasses, the
+exact-capacity C overflow, and comment-only SQLite regression tests.
 
 GLM 5.3 Flash NVFP4 ran through Toilgate on four DGX Sparks. DeepSeek V4.1
 Flash 1017 used Mia's 2.9 bpw EXL3 TensorFold recipe directly on two DGX
@@ -32,7 +33,7 @@ diagnostic observations, not a controlled speed comparison.
 
 The public JSON files contain request settings, observed model identities,
 checks, usage, and stop states. Conversation content, tool calls, file diffs,
-and endpoint details remain in private source receipts. The card's generic
-instruction to read JSON for tool calls therefore applies to full local
-receipts, not these public summaries. One pass per model does not establish
-reliability; this pilot did not separate the three systems on correctness.
+and endpoint details remain in private source receipts. The public cards point
+readers to the checks and stop state available in these summaries. One pass
+per model does not establish reliability; this pilot did not separate the
+three systems on correctness.

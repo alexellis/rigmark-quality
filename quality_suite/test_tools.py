@@ -86,6 +86,23 @@ class ReviewGradeTests(unittest.TestCase):
                 if kind == 'sound':
                     self.assertFalse(checks['real_issue'])
 
+    def test_causal_review_accepts_equivalent_verbs(self):
+        for verb in ('checks', 'sees', 'loads'):
+            with self.subTest(verb=verb):
+                evidence = (f'Submit {verb} wasClosed == false, then unlocks. '
+                            'Close closes jobs before Submit sends to jobs, '
+                            'so Submit panics on the closed channel.')
+                self.assertTrue(advanced_evaluators.review_cause(
+                    'send_on_closed_channel', evidence))
+
+    def test_causal_review_accepts_unlock_before_interleaving(self):
+        evidence = ('Submit reads wasClosed under the mutex, then unlocks before '
+                    'sending to jobs. Interleaving: Submit reads wasClosed=false; '
+                    'Close closes jobs; Submit sends to the closed channel and '
+                    'panics with send on closed channel.')
+        self.assertTrue(advanced_evaluators.review_cause(
+            'send_on_closed_channel', evidence))
+
     def test_false_positive_fails(self):
         with tempfile.TemporaryDirectory() as directory:
             calls = self.review_calls(directory)

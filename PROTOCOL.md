@@ -4,7 +4,9 @@ Protocol 1.0 uses nineteen fixed tasks. It is a diagnostic suite, not a
 quality score. A receipt is one model attempt on one task. It records the
 requested and observed model, the complete request settings, task/suite
 hashes, runtime image, elapsed time, tool calls, file diffs, independent
-checks, and the reason the governor stopped the attempt.
+checks, and the reason the governor stopped the attempt. Published example
+JSON summaries omit tool calls, conversation content, and file diffs; their
+cards describe only fields those summaries contain.
 
 The default limit is 1,800 seconds per task. Typed-tool tasks request 32,768
 output tokens per response and have no default model-turn cap; an explicit

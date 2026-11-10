@@ -113,6 +113,15 @@ int main(void) {
     assert(decode_frame(long_frame, sizeof long_frame, small, sizeof small) == -1);
     assert(strcmp(small, "ok") == 0);
 
+    unsigned char equal_frame[] = {4, 'a', 'b', 'c', 'd'};
+    struct { char out[4]; unsigned char canary[4]; } exact =
+        {{'k', 'e', 'e', 'p'}, {0xa5, 0xa5, 0xa5, 0xa5}};
+    assert(decode_frame(equal_frame, sizeof equal_frame, exact.out, sizeof exact.out) == -1);
+    assert(memcmp(exact.out, "keep", sizeof exact.out) == 0);
+    for (size_t i = 0; i < sizeof exact.canary; i++) {
+        assert(exact.canary[i] == 0xa5);
+    }
+
     assert(decode_frame(valid, 0, guard, sizeof guard) == -1);
     assert(decode_frame(NULL, 0, guard, sizeof guard) == -1);
     assert(decode_frame(valid, sizeof valid, NULL, 0) == -1);
@@ -151,16 +160,21 @@ def review_cause(kind, evidence):
                   r'(?:\w+\s+){0,2}panic\b', text)
             or re.search(r'\b(?:is|remains)\s+safe\b', text)):
         return False
+    unlock = re.search(r'\b(?:unlocks?|releases?)\b', text)
+    closes_jobs = re.search(r'\bcloses?\s*\(?\s*(?:d\.)?jobs\b', text)
+    if not unlock or not closes_jobs or unlock.start() > closes_jobs.start():
+        return False
+    cause = text.partition('interleaving:')[2] or text
     position = 0
     for pattern in (
             r'\bsubmit\b',
-            r'\b(?:reads?|observes?)\s+(?:d\.)?(?:wasclosed|closed)\s*(?:==|=)\s*false\b',
-            r'\b(?:unlocks?|releases?)\b',
+            r'\b(?:reads?|observes?|checks?|sees?|loads?)\s+'
+            r'(?:d\.)?(?:wasclosed|closed)\s*(?:==|=)\s*false\b',
             r'\bclose\b',
             r'\bcloses?\s*\(?\s*(?:d\.)?jobs\b',
             r'(?:\b(?:d\.)?jobs\s*<-\s*job\b|\bsends?\b)',
             r'\bpanic(?:s|king|ked)?\b'):
-        match = re.search(pattern, text[position:])
+        match = re.search(pattern, cause[position:])
         if not match:
             return False
         position += match.end()

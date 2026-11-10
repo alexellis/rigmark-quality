@@ -234,10 +234,16 @@ def reference(task_id, workspace):
         (workspace / 'indexes.sql').write_text(INDEX_REFERENCE)
         with (workspace / 'test_report.py').open('a') as tests:
             tests.write('''\nclass ReferenceReportTest(unittest.TestCase):
-    def test_empty_result(self):
+    def test_date_boundary_and_discount(self):
+        """The original report must fail this date and discount regression."""
         conn = sqlite3.connect(":memory:")
         conn.executescript(SCHEMA)
+        conn.executemany("INSERT INTO customers VALUES (?, ?)", [(1, 'One'), (2, 'Two')])
+        conn.executemany("INSERT INTO orders VALUES (?, ?, ?, ?)", [
+            (1, 1, 'paid', '2026-10-01'), (2, 2, 'paid', '2026-09-30')])
+        conn.executemany("INSERT INTO order_lines VALUES (?, ?, ?, ?, ?)", [
+            (1, 1, 'A', 2, 100), (2, 1, 'discount', 1, -25), (3, 2, 'B', 1, 999)])
         conn.executescript(Path('indexes.sql').read_text())
         self.assertEqual(conn.execute(Path('report.sql').read_text(),
-                         {'since': '2027-01-01'}).fetchall(), [])
+                         {'since': '2026-10-01'}).fetchall(), [(1, 175)])
 ''')

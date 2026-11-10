@@ -208,6 +208,8 @@ By default, `report` prints a compact ASCII card per model and suite hash.
 Use `--format json` for a machine-readable diagnostic matrix. Each task JSON
 receipt records the requested and observed model, request limits, suite and
 task hashes, runtime image, checks, elapsed time, tool trace, and stop reason.
+Published example JSON summaries omit the tool trace, conversation content,
+and file diffs; their cards point only to fields they include.
 The card deliberately separates **artefact passed** from **conversation
 finished**: correct code followed by a reasoning loop is a distinct outcome.
 Coding artefacts must pass both the final public tests and withheld checks;
@@ -230,6 +232,10 @@ The separate [release-assets workflow](.github/workflows/release-assets.yml)
 packages the CLI and checksum only when a release is published.
 
 ## Receipts
+
+The [10 November protocol 1.0 pilot](examples/receipts/2026-11-10-protocol-1.0-pilot/README.md)
+covers the six new tasks on three serving stacks, with one attempt per model
+and task. It is a selected pilot, not a complete 19-task run or a ranking.
 
 The [13 October protocol 0.6 cards](examples/receipts/2026-10-13-protocol-06/cards.txt)
 and [public JSON summaries](examples/receipts/2026-10-13-protocol-06/) record

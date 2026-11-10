@@ -60,16 +60,24 @@ class Acceptance(unittest.TestCase):
             conn.execute('SELECT * FROM invoice_items ORDER BY line_id').fetchall()))
 
     def test_conflicting_metadata_rolls_back_everything(self):
-        conn = legacy_connection()
-        rows = [(17, 'INV-X', 'first@example.test', '2026-10-01', 500, 'A', 1, 500),
-                (29, 'INV-X', 'second@example.test', '2026-10-01', 500, 'B', 1, 0)]
-        conn.executemany('INSERT INTO invoice_lines VALUES (?,?,?,?,?,?,?,?)', rows)
-        conn.commit()
-        with self.assertRaises((ValueError, sqlite3.DatabaseError)):
-            migrate(conn)
-        self.assertEqual(tables(conn), {'invoice_lines', 'audit_log'})
-        self.assertEqual(conn.execute('SELECT * FROM invoice_lines ORDER BY line_id').fetchall(), rows)
-        self.assertEqual(conn.execute('PRAGMA user_version').fetchone()[0], 0)
+        for field, replacement in (('customer_email', 'second@example.test'),
+                                   ('issued_on', '2026-10-02'),
+                                   ('paid_cents', 501)):
+            with self.subTest(field=field):
+                conn = legacy_connection()
+                first = (17, 'INV-X', 'first@example.test', '2026-10-01', 500, 'A', 1, 500)
+                second = [29, 'INV-X', 'first@example.test', '2026-10-01', 500, 'B', 1, 0]
+                second[{'customer_email': 2, 'issued_on': 3, 'paid_cents': 4}[field]] = replacement
+                rows = [first, tuple(second)]
+                conn.executemany('INSERT INTO invoice_lines VALUES (?,?,?,?,?,?,?,?)', rows)
+                conn.execute("INSERT INTO audit_log VALUES (7, 'retain')")
+                conn.commit()
+                with self.assertRaises((ValueError, sqlite3.DatabaseError)):
+                    migrate(conn)
+                self.assertEqual(tables(conn), {'invoice_lines', 'audit_log'})
+                self.assertEqual(conn.execute('SELECT * FROM invoice_lines ORDER BY line_id').fetchall(), rows)
+                self.assertEqual(conn.execute('SELECT * FROM audit_log').fetchall(), [(7, 'retain')])
+                self.assertEqual(conn.execute('PRAGMA user_version').fetchone()[0], 0)
 
     def test_caller_can_roll_back_migration(self):
         conn = legacy_connection()

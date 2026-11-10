@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "0246ea126e8d043fc27915800439e95e384ad8e9b0b287b3f9bc9722f24547f7",
+  "suite_sha256": "a9ad27bfac58051df2f8fcfe0d46fa8915afe8e030f406822f4b60438e9b1bd0",
   "task_sha256": "82c8400d98f8ff5fbc220e6ecb94e639fca3f47483bb6e1f4f1d6a7c3f5fcbf5",
   "request": {
     "temperature": 0,
@@ -29,39 +29,35 @@
     "DeepSeek-V4.1-Flash-1017",
     "DeepSeek-V4.1-Flash-1017",
     "DeepSeek-V4.1-Flash-1017",
-    "DeepSeek-V4.1-Flash-1017",
-    "DeepSeek-V4.1-Flash-1017",
-    "DeepSeek-V4.1-Flash-1017",
-    "DeepSeek-V4.1-Flash-1017",
-    "DeepSeek-V4.1-Flash-1017",
     "DeepSeek-V4.1-Flash-1017"
   ],
   "model_match": true,
-  "started_at": "2026-11-10T16:06:00.924198+00:00",
-  "finished_at": "2026-11-10T16:07:41.243748+00:00",
-  "elapsed_seconds": 100.3,
+  "started_at": "2026-11-10T16:35:55.401753+00:00",
+  "finished_at": "2026-11-10T16:37:17.902593+00:00",
+  "elapsed_seconds": 82.5,
   "usage": {
-    "prompt_tokens": 113128,
-    "completion_tokens": 7986,
-    "reasoning_tokens": 3186
+    "prompt_tokens": 55195,
+    "completion_tokens": 7004,
+    "reasoning_tokens": 2798
   },
   "reasoning_diagnostics": {
-    "characters": 14159,
-    "repeated_trigram_fraction": 0.094,
+    "characters": 12543,
+    "repeated_trigram_fraction": 0.092,
     "loop_detected": false
   },
   "tool_diagnostics": {
-    "parsed_calls": 18,
+    "parsed_calls": 11,
     "invalid_calls": 0,
     "no_call_or_answer": false,
     "unfinished_after_tool": false,
     "unparsed_tool_markup": false
   },
-  "steps": 15,
+  "steps": 10,
   "checks": {
     "acceptance": true,
     "public_tests": true,
-    "regression_test_added": true
+    "regression_test_added": true,
+    "regression_fails_on_original": true
   },
   "artefact_passed": true,
   "conversation_finished": true,
@@ -69,5 +65,5 @@
   "failure": null,
   "review_output_format": null,
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with strengthened acceptance checks. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with strengthened hidden acceptance and regression checks. Conversation, tool calls, file diffs, and endpoint details omitted."
 }

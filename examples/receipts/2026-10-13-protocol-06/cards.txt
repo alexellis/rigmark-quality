@@ -25,7 +25,7 @@
 │  security-boundary           yes       yes         28.3s normal            │
 │                                                                            │
 │  Artefact and conversation completion are separate outcomes.               │
-│  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│  Read the JSON summary for checks and stop state.                          │
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │
@@ -61,7 +61,7 @@
 │  security-boundary           yes       yes          5.0s normal            │
 │                                                                            │
 │  Artefact and conversation completion are separate outcomes.               │
-│  Read the JSON receipt for checks, tool calls, and stop reasons.           │
+│  Read the JSON summary for checks and stop state.                          │
 │                                                                            │
 ├─ RUN ──────────────────────────────────────────────────────────────────────┤
 │                                                                            │

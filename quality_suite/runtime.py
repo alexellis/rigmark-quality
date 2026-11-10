@@ -71,7 +71,7 @@ def acceptance_command(task_id):
         'arkade-add': 'go test -mod=vendor -count=1 -timeout=60s ./pkg/get -run "TestRigmarkAcceptance"',
         'sqlite-migration': 'python3 -B -m unittest -v sqlite_migration_acceptance',
         'sqlite-report': 'python3 -B -m unittest -v sqlite_report_acceptance',
-        'go-shutdown-deadlock': 'go test -race -count=1 -timeout=60s ./... -run "TestRigmarkAcceptance"',
-        'go-export-boundary': 'go test -race -count=1 -timeout=60s ./... -run "TestRigmarkAcceptance"',
+        'go-shutdown-deadlock': 'go test -json -race -count=1 -timeout=60s -run "^TestRigmarkAcceptanceShutdown$" .',
+        'go-export-boundary': 'go test -json -race -count=1 -timeout=60s -run "^TestRigmarkAcceptanceTenantBoundary$" .',
         'c-frame-bounds': 'cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer -no-pie frame.c rigmark_acceptance.c -o /tmp/rigmark-frame && ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 /tmp/rigmark-frame',
     }[task_id]

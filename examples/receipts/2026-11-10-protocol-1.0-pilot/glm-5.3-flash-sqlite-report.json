@@ -4,7 +4,7 @@
   "interpretation": "diagnostic_only",
   "task_status": "experimental",
   "suite_version": "1.0",
-  "suite_sha256": "0246ea126e8d043fc27915800439e95e384ad8e9b0b287b3f9bc9722f24547f7",
+  "suite_sha256": "a9ad27bfac58051df2f8fcfe0d46fa8915afe8e030f406822f4b60438e9b1bd0",
   "task_sha256": "3f60d44163c9520566ca0dd02167ceeacb4796650940f61181e2804d9708101f",
   "request": {
     "temperature": 0,
@@ -28,12 +28,12 @@
     "nvidia/GLM-5.3-Flash-NVFP4"
   ],
   "model_match": true,
-  "started_at": "2026-11-10T16:06:28.975157+00:00",
-  "finished_at": "2026-11-10T16:06:45.802139+00:00",
-  "elapsed_seconds": 16.8,
+  "started_at": "2026-11-10T16:36:15.974639+00:00",
+  "finished_at": "2026-11-10T16:36:28.400399+00:00",
+  "elapsed_seconds": 12.4,
   "usage": {
-    "prompt_tokens": 11720,
-    "completion_tokens": 1221,
+    "prompt_tokens": 10806,
+    "completion_tokens": 759,
     "reasoning_tokens": 0
   },
   "reasoning_diagnostics": {
@@ -52,7 +52,8 @@
   "checks": {
     "acceptance": true,
     "public_tests": true,
-    "regression_test_added": true
+    "regression_test_added": true,
+    "regression_fails_on_original": true
   },
   "artefact_passed": true,
   "conversation_finished": true,
@@ -60,5 +61,5 @@
   "failure": null,
   "review_output_format": null,
   "receipt_kind": "public_summary",
-  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with strengthened acceptance checks. Conversation, tool calls, file diffs, and endpoint details omitted."
+  "source_note": "10 November 2026 six-task protocol 1.0 pilot, rerun with strengthened hidden acceptance and regression checks. Conversation, tool calls, file diffs, and endpoint details omitted."
 }
